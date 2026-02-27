@@ -6,11 +6,13 @@ const {
     getAllMovies,
     getMovieById,
     updateMovie,
-    deleteMovie
+    deleteMovie,
+    syncMoviesFromTMDB
 } = require("../controllers/movieController");
 
 // Public routes  - anyone can view movies
 router.get("/", getAllMovies);           // GET    /api/movies
+router.get("/sync", syncMoviesFromTMDB); // GET    /api/movies/sync  (fetch from TMDB)
 router.get("/:id", getMovieById);       // GET    /api/movies/:id
 
 // Protected routes - only logged-in users (later: admin only)

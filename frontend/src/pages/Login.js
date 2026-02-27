@@ -16,7 +16,13 @@ function Login() {
         try {
             const res = await API.post("/auth/login", { email, password });
             localStorage.setItem("token", res.data.token);
-            navigate("/");
+            localStorage.setItem("role", res.data.user?.role || "user");
+            const userRole = res.data.user?.role || "user";
+            if (userRole === "admin") {
+                navigate("/admin");
+            } else {
+                navigate("/");
+            }
             window.location.reload();   // refresh navbar to show Logout
         } catch (err) {
             setError(err.response?.data?.msg || "Login failed. Try again.");

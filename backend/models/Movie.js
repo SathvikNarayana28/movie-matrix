@@ -1,6 +1,7 @@
 const mongoose = require("mongoose");
 
 const MovieSchema = new mongoose.Schema({
+    tmdbId: { type: String, unique: true, sparse: true }, // optional TMDB ID to prevent duplicates
     title: { type: String, required: true },
     genre: { type: [String], required: true },          // e.g. ["Action", "Sci-Fi"]
     language: { type: String, required: true },          // e.g. "English"

@@ -7,6 +7,8 @@ function Register() {
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [adminCode, setAdminCode] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
 
@@ -15,8 +17,17 @@ function Register() {
         setError("");
         setSuccess("");
 
+        const payload = { name, email, password };
+        if (isAdmin) {
+            if (!adminCode.trim()) {
+                setError("Admin access code is required.");
+                return;
+            }
+            payload.adminCode = adminCode.trim();
+        }
+
         try {
-            const res = await API.post("/auth/register", { name, email, password });
+            const res = await API.post("/auth/register", payload);
             setSuccess(res.data.msg + " Redirecting to login...");
             setTimeout(() => {
                 window.location.href = "/login";
@@ -60,6 +71,35 @@ function Register() {
                     placeholder="Create a password"
                     required
                 />
+
+                {/* Admin Toggle */}
+                <div className="admin-toggle">
+                    <label className="toggle-label">
+                        <input
+                            type="checkbox"
+                            checked={isAdmin}
+                            onChange={(e) => {
+                                setIsAdmin(e.target.checked);
+                                if (!e.target.checked) setAdminCode("");
+                            }}
+                        />
+                        <span>Register as Admin</span>
+                    </label>
+                </div>
+
+                {/* Admin Secret Code — only visible when toggle is ON */}
+                {isAdmin && (
+                    <>
+                        <label>Admin Access Code</label>
+                        <input
+                            type="password"
+                            value={adminCode}
+                            onChange={(e) => setAdminCode(e.target.value)}
+                            placeholder="Enter admin secret code"
+                            required
+                        />
+                    </>
+                )}
 
                 <button type="submit">Register</button>
 

@@ -1,0 +1,63 @@
+.my-bookings {
+    max-width: 800px;
+    margin: 40px auto;
+    padding: 20px;
+}
+
+.my-bookings h2 {
+    margin-top: 0;
+    color: #1a1a2e;
+}
+
+.booking-list {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 20px;
+}
+
+.booking-card {
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 5px;
+    background-color: #fafafa;
+}
+
+.booking-card h3 {
+    margin: 0 0 8px 0;
+}
+
+.cancel-btn {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background-color: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.cancel-btn:hover {
+    background-color: #d13350;
+}
+
+/* spinner reused */
+.spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid #fff;
+    border-top: 2px solid #e94560;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.no-bookings,
+.loading-text,
+.error-text {
+    text-align: center;
+    margin-top: 30px;
+}
