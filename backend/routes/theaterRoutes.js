@@ -6,11 +6,13 @@ const {
     getAllTheaters,
     getTheaterById,
     updateTheater,
-    deleteTheater
+    deleteTheater,
+    getNearbyTheaters
 } = require("../controllers/theaterController");
 
 // Public routes
 router.get("/", getAllTheaters);            // GET    /api/theaters
+router.get("/nearby", getNearbyTheaters);   // GET    /api/theaters/nearby?city=...
 router.get("/:id", getTheaterById);        // GET    /api/theaters/:id
 
 // Protected routes (admin use)

@@ -1,6 +1,10 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api";
+import {
+    LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from "recharts";
 import "./AdminDashboard.css";
 
 function AdminDashboard() {
@@ -26,7 +30,7 @@ function AdminDashboard() {
 
     // ---- Theatre form state ----
     const [theatreForm, setTheatreForm] = useState({
-        name: "", location: "", totalSeats: ""
+        name: "", city: "", area: "", screens: "", totalSeatsPerScreen: ""
     });
 
     // ---- Data lists ----
@@ -38,6 +42,39 @@ function AdminDashboard() {
     const [msg, setMsg] = useState("");
     const [error, setError] = useState("");
     const [submitting, setSubmitting] = useState(false);
+
+    // ---- Analytics state ----
+    const [analytics, setAnalytics] = useState(null);
+    const [analyticsLoading, setAnalyticsLoading] = useState(false);
+
+    // ---- Revenue Analytics state ----
+    const [revenueData, setRevenueData] = useState(null);
+    const [revenueLoading, setRevenueLoading] = useState(false);
+
+    // ---- Analytics fetch functions (wrapped in useCallback for stable refs) ----
+    const fetchAnalytics = useCallback(async () => {
+        setAnalyticsLoading(true);
+        try {
+            const res = await API.get("/admin/analytics");
+            setAnalytics(res.data);
+        } catch (err) {
+            console.error("Failed to fetch analytics");
+        } finally {
+            setAnalyticsLoading(false);
+        }
+    }, []);
+
+    const fetchRevenueAnalytics = useCallback(async () => {
+        setRevenueLoading(true);
+        try {
+            const res = await API.get("/admin/revenue-analytics");
+            setRevenueData(res.data);
+        } catch (err) {
+            console.error("Failed to fetch revenue analytics");
+        } finally {
+            setRevenueLoading(false);
+        }
+    }, []);
 
     // Check admin role on mount
     useEffect(() => {
@@ -52,7 +89,9 @@ function AdminDashboard() {
         fetchMovies();
         fetchTheatres();
         fetchShows();
-    }, []);
+        fetchAnalytics();
+        fetchRevenueAnalytics();
+    }, [fetchAnalytics, fetchRevenueAnalytics]);
 
     const fetchMovies = async () => {
         try {
@@ -79,6 +118,21 @@ function AdminDashboard() {
         } catch (err) {
             console.error("Failed to fetch shows");
         }
+    };
+
+    // Auto-refresh analytics every 10 seconds when analytics tab is active
+    useEffect(() => {
+        if (activeTab !== "analytics") return;
+        const interval = setInterval(() => {
+            fetchAnalytics();
+            fetchRevenueAnalytics();
+        }, 10000);
+        return () => clearInterval(interval);
+    }, [activeTab, fetchAnalytics, fetchRevenueAnalytics]);
+
+    const handleManualRefresh = () => {
+        fetchAnalytics();
+        fetchRevenueAnalytics();
     };
 
     const clearMessages = () => { setMsg(""); setError(""); };
@@ -184,10 +238,11 @@ function AdminDashboard() {
         try {
             const res = await API.post("/admin/theatres", {
                 ...theatreForm,
-                totalSeats: Number(theatreForm.totalSeats)
+                screens: Number(theatreForm.screens),
+                totalSeatsPerScreen: Number(theatreForm.totalSeatsPerScreen)
             });
             setMsg(res.data.msg);
-            setTheatreForm({ name: "", location: "", totalSeats: "" });
+            setTheatreForm({ name: "", city: "", area: "", screens: "", totalSeatsPerScreen: "" });
             fetchTheatres();
         } catch (err) {
             setError(err.response?.data?.msg || "Failed to add theatre");
@@ -248,6 +303,7 @@ function AdminDashboard() {
                 <button className={activeTab === "movies" ? "tab active" : "tab"} onClick={() => { setActiveTab("movies"); clearMessages(); }}>Add Movie</button>
                 <button className={activeTab === "theatres" ? "tab active" : "tab"} onClick={() => { setActiveTab("theatres"); clearMessages(); }}>Theatres</button>
                 <button className={activeTab === "shows" ? "tab active" : "tab"} onClick={() => { setActiveTab("shows"); clearMessages(); }}>All Shows</button>
+                <button className={activeTab === "analytics" ? "tab active" : "tab"} onClick={() => { setActiveTab("analytics"); clearMessages(); }}>Analytics</button>
             </div>
 
             {/* ===================== ADD MOVIE TAB ===================== */}
@@ -369,7 +425,7 @@ function AdminDashboard() {
                                 <select value={showFields.theater} onChange={(e) => setShowFields({ ...showFields, theater: e.target.value })} required>
                                     <option value="">Select Theatre</option>
                                     {theatres.map((t) => (
-                                        <option key={t._id} value={t._id}>{t.name} — {t.location}</option>
+                                        <option key={t._id} value={t._id}>{t.name} — {t.area}, {t.city}</option>
                                     ))}
                                 </select>
                             </div>
@@ -418,16 +474,26 @@ function AdminDashboard() {
                         <div className="form-row">
                             <div className="form-group">
                                 <label>Name *</label>
-                                <input type="text" value={theatreForm.name} onChange={(e) => setTheatreForm({ ...theatreForm, name: e.target.value })} required />
+                                <input type="text" value={theatreForm.name} onChange={(e) => setTheatreForm({ ...theatreForm, name: e.target.value })} placeholder="e.g. AMB Cinemas" required />
                             </div>
                             <div className="form-group">
-                                <label>Location *</label>
-                                <input type="text" value={theatreForm.location} onChange={(e) => setTheatreForm({ ...theatreForm, location: e.target.value })} required />
+                                <label>City *</label>
+                                <input type="text" value={theatreForm.city} onChange={(e) => setTheatreForm({ ...theatreForm, city: e.target.value })} placeholder="e.g. Hyderabad" required />
+                            </div>
+                        </div>
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label>Area *</label>
+                                <input type="text" value={theatreForm.area} onChange={(e) => setTheatreForm({ ...theatreForm, area: e.target.value })} placeholder="e.g. Gachibowli" required />
+                            </div>
+                            <div className="form-group">
+                                <label>Screens *</label>
+                                <input type="number" value={theatreForm.screens} onChange={(e) => setTheatreForm({ ...theatreForm, screens: e.target.value })} placeholder="e.g. 4" required />
                             </div>
                         </div>
                         <div className="form-group">
-                            <label>Total Seats *</label>
-                            <input type="number" value={theatreForm.totalSeats} onChange={(e) => setTheatreForm({ ...theatreForm, totalSeats: e.target.value })} required />
+                            <label>Total Seats Per Screen *</label>
+                            <input type="number" value={theatreForm.totalSeatsPerScreen} onChange={(e) => setTheatreForm({ ...theatreForm, totalSeatsPerScreen: e.target.value })} placeholder="e.g. 100" required />
                         </div>
                         <button type="submit" className="admin-btn">Add Theatre</button>
                     </form>
@@ -438,7 +504,7 @@ function AdminDashboard() {
                             <div key={t._id} className="admin-list-item">
                                 <div className="item-info">
                                     <strong>{t.name}</strong>
-                                    <span>{t.location} &middot; {t.totalSeats} seats</span>
+                                    <span>{t.area}, {t.city} &middot; {t.screens} screens &middot; {t.totalSeatsPerScreen} seats/screen</span>
                                 </div>
                                 <button className="delete-btn" onClick={() => handleDeleteTheatre(t._id)}>Delete</button>
                             </div>
@@ -457,7 +523,7 @@ function AdminDashboard() {
                                 <div className="item-info">
                                     <strong>{s.movie?.title || "Unknown Movie"}</strong>
                                     <span>
-                                        {s.theater?.name || "Unknown Theatre"} &middot;{" "}
+                                        {s.theater?.name || "Unknown Theatre"} ({s.theater?.area || ""}) &middot;{" "}
                                         {new Date(s.date).toLocaleDateString()} &middot; {s.time} &middot; ₹{s.price}
                                     </span>
                                 </div>
@@ -465,6 +531,168 @@ function AdminDashboard() {
                             </div>
                         ))}
                     </div>
+                </div>
+            )}
+            {/* ===================== ANALYTICS TAB ===================== */}
+            {activeTab === "analytics" && (
+                <div className="admin-section">
+                    <div className="analytics-header">
+                        <h2>Booking Analytics</h2>
+                        <div className="analytics-refresh-bar">
+                            <span className="auto-refresh-label">
+                                {analyticsLoading || revenueLoading ? "Refreshing..." : "Auto-refreshing every 10s"}
+                            </span>
+                            <button className="refresh-btn" onClick={handleManualRefresh} disabled={analyticsLoading || revenueLoading}>
+                                {analyticsLoading || revenueLoading ? "↻ Refreshing..." : "↻ Refresh Now"}
+                            </button>
+                        </div>
+                    </div>
+                    {analyticsLoading ? (
+                        <p>Loading analytics...</p>
+                    ) : analytics ? (
+                        <div className="analytics-grid">
+                            <div className="analytics-card">
+                                <h3>Total Bookings</h3>
+                                <p className="analytics-value">{analytics.totalBookings}</p>
+                            </div>
+                            <div className="analytics-card">
+                                <h3>Total Revenue</h3>
+                                <p className="analytics-value">₹{analytics.totalRevenue.toLocaleString("en-IN")}</p>
+                            </div>
+                            <div className="analytics-card">
+                                <h3>Most Popular Movie</h3>
+                                {analytics.mostPopularMovie ? (
+                                    <>
+                                        <p className="analytics-value">{analytics.mostPopularMovie.name}</p>
+                                        <p className="analytics-sub">{analytics.mostPopularMovie.count} bookings</p>
+                                    </>
+                                ) : (
+                                    <p className="analytics-value">No data</p>
+                                )}
+                            </div>
+                            <div className="analytics-card">
+                                <h3>Most Booked Theatre</h3>
+                                {analytics.mostBookedTheatre ? (
+                                    <>
+                                        <p className="analytics-value">{analytics.mostBookedTheatre.name}</p>
+                                        <p className="analytics-sub">{analytics.mostBookedTheatre.count} bookings</p>
+                                    </>
+                                ) : (
+                                    <p className="analytics-value">No data</p>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <p>No analytics data available.</p>
+                    )}
+
+                    {/* ---- Revenue Charts ---- */}
+                    <h2>Revenue Charts</h2>
+                    {revenueLoading ? (
+                        <p>Loading revenue charts...</p>
+                    ) : revenueData ? (
+                        <div className="revenue-charts">
+                            {/* Daily Revenue — Line Chart */}
+                            <div className="chart-card">
+                                <h3 className="chart-title">Daily Revenue (Last 7 Days)</h3>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <LineChart data={revenueData.dailyRevenue}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                        <XAxis dataKey="date" stroke="#aaa" tick={{ fontSize: 12 }} />
+                                        <YAxis stroke="#aaa" tick={{ fontSize: 12 }} />
+                                        <Tooltip
+                                            contentStyle={{ background: "#1e1e2e", border: "1px solid #444", borderRadius: 8 }}
+                                            labelStyle={{ color: "#f5c518" }}
+                                            itemStyle={{ color: "#fff" }}
+                                            formatter={(value) => [`₹${value.toLocaleString("en-IN")}`, "Revenue"]}
+                                        />
+                                        <Legend />
+                                        <Line type="monotone" dataKey="revenue" stroke="#e94560" strokeWidth={2} dot={{ fill: "#e94560", r: 4 }} name="Revenue (₹)" />
+                                        <Line type="monotone" dataKey="count" stroke="#f5c518" strokeWidth={2} dot={{ fill: "#f5c518", r: 4 }} name="Bookings" />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            {/* Weekly Revenue — Bar Chart */}
+                            <div className="chart-card">
+                                <h3 className="chart-title">Weekly Revenue (Last 4 Weeks)</h3>
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={revenueData.weeklyRevenue}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                        <XAxis dataKey="week" stroke="#aaa" tick={{ fontSize: 11 }} />
+                                        <YAxis stroke="#aaa" tick={{ fontSize: 12 }} />
+                                        <Tooltip
+                                            contentStyle={{ background: "#1e1e2e", border: "1px solid #444", borderRadius: 8 }}
+                                            labelStyle={{ color: "#f5c518" }}
+                                            itemStyle={{ color: "#fff" }}
+                                            formatter={(value) => [`₹${value.toLocaleString("en-IN")}`, "Revenue"]}
+                                        />
+                                        <Legend />
+                                        <Bar dataKey="revenue" fill="#e94560" radius={[6, 6, 0, 0]} name="Revenue (₹)" />
+                                        <Bar dataKey="count" fill="#f5c518" radius={[6, 6, 0, 0]} name="Bookings" />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            {/* Movie-wise Revenue — Pie Chart */}
+                            <div className="chart-card">
+                                <h3 className="chart-title">Movie-wise Revenue (Top 5)</h3>
+                                {revenueData.movieRevenue.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <PieChart>
+                                            <Pie
+                                                data={revenueData.movieRevenue}
+                                                dataKey="revenue"
+                                                nameKey="name"
+                                                cx="50%"
+                                                cy="50%"
+                                                outerRadius={100}
+                                                label={({ name, percent }) => `${name.length > 12 ? name.slice(0, 12) + "…" : name} (${(percent * 100).toFixed(0)}%)`}
+                                            >
+                                                {revenueData.movieRevenue.map((entry, idx) => (
+                                                    <Cell key={idx} fill={["#e94560", "#f5c518", "#00c49f", "#8884d8", "#ff8042"][idx % 5]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                contentStyle={{ background: "#1e1e2e", border: "1px solid #444", borderRadius: 8 }}
+                                                itemStyle={{ color: "#fff" }}
+                                                formatter={(value) => `₹${value.toLocaleString("en-IN")}`}
+                                            />
+                                            <Legend />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <p className="no-chart-data">No movie revenue data available.</p>
+                                )}
+                            </div>
+
+                            {/* Theatre-wise Revenue — Bar Chart */}
+                            <div className="chart-card">
+                                <h3 className="chart-title">Theatre-wise Revenue (Top 5)</h3>
+                                {revenueData.theatreRevenue.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height={300}>
+                                        <BarChart data={revenueData.theatreRevenue} layout="vertical">
+                                            <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                                            <XAxis type="number" stroke="#aaa" tick={{ fontSize: 12 }} />
+                                            <YAxis dataKey="name" type="category" stroke="#aaa" tick={{ fontSize: 11 }} width={120} />
+                                            <Tooltip
+                                                contentStyle={{ background: "#1e1e2e", border: "1px solid #444", borderRadius: 8 }}
+                                                labelStyle={{ color: "#f5c518" }}
+                                                itemStyle={{ color: "#fff" }}
+                                                formatter={(value) => [`₹${value.toLocaleString("en-IN")}`, "Revenue"]}
+                                            />
+                                            <Legend />
+                                            <Bar dataKey="revenue" fill="#00c49f" radius={[0, 6, 6, 0]} name="Revenue (₹)" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <p className="no-chart-data">No theatre revenue data available.</p>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <p>No revenue data available.</p>
+                    )}
                 </div>
             )}
         </div>

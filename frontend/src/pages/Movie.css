@@ -57,8 +57,112 @@
     font-size: 0.9rem;
 }
 
+.trailer-btn {
+    margin-top: 12px;
+    padding: 10px 20px;
+    background-color: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+.trailer-btn:hover {
+    background-color: #d63050;
+}
+
+.trailer-btn:disabled {
+    background-color: #999;
+    cursor: not-allowed;
+}
+
+.trailer-error {
+    margin-top: 8px;
+    color: #c00;
+    font-size: 0.9rem;
+}
+
 .showtimes-heading {
     margin-top: 32px;
+}
+
+/* ========== City Filter ========== */
+.city-filter {
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.city-filter label {
+    font-weight: 600;
+    color: #555;
+    font-size: 14px;
+}
+
+.city-filter select {
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    outline: none;
+    font-family: inherit;
+}
+
+.city-filter select:focus {
+    border-color: #e94560;
+}
+
+/* ========== Date Tabs ========== */
+.date-tabs {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 6px;
+    margin-bottom: 20px;
+}
+
+.date-tabs::-webkit-scrollbar {
+    height: 4px;
+}
+
+.date-tabs::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 2px;
+}
+
+.date-tab {
+    flex: 0 0 auto;
+    padding: 8px 18px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.date-tab:hover {
+    border-color: #e94560;
+    color: #e94560;
+}
+
+.date-tab-active {
+    background: #e94560;
+    color: #fff;
+    border-color: #e94560;
+}
+
+.date-tab-active:hover {
+    background: #d63050;
+    color: #fff;
 }
 
 .showtime-list {
@@ -76,6 +180,19 @@
 
 .theater-name {
     font-weight: bold;
+}
+
+.theater-area {
+    font-size: 0.85rem;
+    color: #777;
+    margin: 2px 0 4px;
+}
+
+.seats-info {
+    font-size: 0.85rem;
+    color: #2e7d32;
+    font-weight: 500;
+    margin: 4px 0;
 }
 
 .datetime,
@@ -100,6 +217,163 @@
 
 .book-btn:hover {
     background-color: #555;
+}
+
+/* ========== Theatre-Grouped Showtimes ========== */
+.theatre-group-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.theatre-group {
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    padding: 18px 20px;
+    background: #fafafa;
+}
+
+.theatre-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 14px;
+}
+
+.theatre-group-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 2px;
+}
+
+.theatre-group-area {
+    font-size: 13px;
+    color: #777;
+    margin: 0;
+}
+
+.theatre-group-screens {
+    font-size: 12px;
+    color: #999;
+    background: #f0f0f0;
+    padding: 3px 10px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.theatre-shows-row {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+}
+
+.theatre-shows-row::-webkit-scrollbar {
+    height: 4px;
+}
+
+.theatre-shows-row::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 2px;
+}
+
+.show-slot {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 10px 16px;
+    border: 1px solid #e94560;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 100px;
+    font-family: inherit;
+}
+
+.show-slot:hover:not(:disabled) {
+    background: #e94560;
+    color: #fff;
+}
+
+.show-slot:hover:not(:disabled) .slot-date,
+.show-slot:hover:not(:disabled) .slot-price,
+.show-slot:hover:not(:disabled) .slot-seats {
+    color: #fff;
+}
+
+.show-slot.sold-out {
+    border-color: #ccc;
+    background: #f5f5f5;
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.slot-time {
+    font-size: 15px;
+    font-weight: 700;
+}
+
+.slot-date {
+    font-size: 12px;
+    color: #777;
+}
+
+.slot-price {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.slot-seats {
+    font-size: 11px;
+    color: #2e7d32;
+    font-weight: 500;
+}
+
+.slot-seats.seat-zero {
+    color: #c00;
+}
+
+.slot-seats.seat-low {
+    color: #e65100;
+}
+
+.filling-fast-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    background: #e94560;
+    padding: 2px 8px;
+    border-radius: 8px;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+}
+
+.show-slot.filling-fast {
+    border-color: #e65100;
+}
+
+.show-slot.filling-fast:hover:not(:disabled) {
+    background: #e65100;
+    border-color: #e65100;
+}
+
+@media (max-width: 600px) {
+    .theatre-group {
+        padding: 14px;
+    }
+    .theatre-group-header {
+        flex-direction: column;
+        gap: 4px;
+    }
+    .show-slot {
+        min-width: 90px;
+        padding: 8px 12px;
+    }
 }
 
 .loading-text,

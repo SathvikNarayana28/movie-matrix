@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import API from "../api";
 import "./Book.css";
@@ -8,12 +8,49 @@ function Book() {
     const navigate = useNavigate();
 
     const [showtime, setShowtime] = useState(null);
-    const [bookedSeats, setBookedSeats] = useState([]);
     const [selectedSeats, setSelectedSeats] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
     const [bookingLoading, setBookingLoading] = useState(false);
+
+    // ---- Seat locking state ----
+    const [lockedSeats, setLockedSeats] = useState([]);       // seats locked by others
+    const [myLockedSeats, setMyLockedSeats] = useState([]);   // seats locked by me
+    const [lockExpiry, setLockExpiry] = useState(null);       // Date when my lock expires
+    const [countdown, setCountdown] = useState(0);            // seconds remaining
+    const [lockError, setLockError] = useState("");
+    const timerRef = useRef(null);
+
+    // Get userId: try localStorage first, fallback to decoding JWT
+    const getUserId = () => {
+        const stored = localStorage.getItem("userId");
+        if (stored) return stored;
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) return null;
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            return payload.id || null;
+        } catch { return null; }
+    };
+    const userId = getUserId();
+
+    // Fetch showtime data
+    const fetchShowtime = useCallback(async () => {
+        try {
+            const res = await API.get(`/showtimes/${showtimeId}`);
+            setShowtime(res.data);
+
+            // Also fetch seat status (booked + locked)
+            const seatRes = await API.get(`/bookings/seats/${showtimeId}`);
+            setLockedSeats(seatRes.data.lockedSeats || []);
+        } catch (err) {
+            console.error(err);
+            setError("Failed to load showtime data");
+        } finally {
+            setLoading(false);
+        }
+    }, [showtimeId]);
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -21,65 +58,118 @@ function Book() {
             navigate("/login");
             return;
         }
+        fetchShowtime();
+    }, [navigate, fetchShowtime]);
 
-        const fetchData = async () => {
-            try {
-                const res = await API.get(`/showtimes/${showtimeId}`);
-                setShowtime(res.data);
-                const seatsRes = await API.get(`/bookings/seats/${showtimeId}`);
-                setBookedSeats(seatsRes.data.bookedSeats || []);
-            } catch (err) {
-                console.error(err);
-                setError("Failed to load showtime data");
-            } finally {
-                setLoading(false);
+    // Countdown timer for seat lock
+    useEffect(() => {
+        if (!lockExpiry) return;
+
+        const tick = () => {
+            const remaining = Math.max(0, Math.floor((lockExpiry.getTime() - Date.now()) / 1000));
+            setCountdown(remaining);
+
+            if (remaining <= 0) {
+                // Lock expired — reset
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+                setLockExpiry(null);
+                setMyLockedSeats([]);
+                setSelectedSeats([]);
+                setLockError("Session expired. Please select seats again.");
+                fetchShowtime(); // refresh seat status
             }
         };
-        fetchData();
-    }, [showtimeId, navigate]);
+
+        tick(); // run immediately
+        timerRef.current = setInterval(tick, 1000);
+
+        return () => {
+            if (timerRef.current) {
+                clearInterval(timerRef.current);
+                timerRef.current = null;
+            }
+        };
+    }, [lockExpiry, fetchShowtime]);
+
+    // Cleanup: unlock seats when user leaves the page
+    useEffect(() => {
+        return () => {
+            // Unlock on component unmount (e.g. navigating away within the app)
+            if (myLockedSeats.length > 0) {
+                API.post("/bookings/unlock-seats", { showtimeId }).catch(() => {});
+            }
+        };
+    }, [myLockedSeats, showtimeId]);
 
     if (loading) return <p className="loading-text">Loading showtime...</p>;
-    if (error) return <p className="error-text">{error}</p>;
+    if (error && !showtime) return <p className="error-text">{error}</p>;
     if (!showtime) return <p className="error-text">Showtime not found</p>;
 
-    // --- Build structured seat rows ---
-    // Total capacity = available seats + already booked seats
-    const capacity = showtime.availableSeats + bookedSeats.length;
-    const seatsPerRow = 6;
-    const totalRows = Math.ceil(capacity / seatsPerRow);
+    // --- Build structured seat rows from showtime.seats ---
+    const allSeats = showtime.seats || [];
+    const availableCount = allSeats.filter(s => !s.isBooked).length;
 
-    // Build rows: each row has { rowLabel, seats: [{ seatId, row, number, isBooked }] }
-    const rows = [];
-    let seatCount = 0;
-    for (let r = 0; r < totalRows; r++) {
-        const rowLabel = String.fromCharCode(65 + r); // A, B, C, D, ...
-        const seatsInRow = [];
-        for (let c = 1; c <= seatsPerRow; c++) {
-            seatCount++;
-            if (seatCount > capacity) break;
-            const seatId = `${rowLabel}${c}`;
-            seatsInRow.push({
-                seatId,
-                row: rowLabel,
-                number: c,
-                isBooked: bookedSeats.includes(seatId)
-            });
+    // Group seats by row letter
+    const rowMap = {};
+    allSeats.forEach(seat => {
+        if (!rowMap[seat.row]) {
+            rowMap[seat.row] = [];
         }
-        if (seatsInRow.length > 0) {
-            rows.push({ rowLabel, seats: seatsInRow });
-        }
-    }
+        rowMap[seat.row].push(seat);
+    });
+
+    // Sort rows alphabetically, seats by number
+    const rows = Object.keys(rowMap).sort().map(rowLabel => ({
+        rowLabel,
+        seats: rowMap[rowLabel].sort((a, b) => a.number - b.number)
+    }));
+
+    // Check if a seat is locked by another user
+    const isSeatLockedByOther = (seatId) => {
+        return lockedSeats.some(l => l.seatId === seatId && l.lockedBy !== userId);
+    };
 
     const handleSeatClick = (seat) => {
         if (seat.isBooked) return;
+        if (isSeatLockedByOther(seat.seatId)) return;
+
+        // If we already have a confirmed lock, don't allow changing selection
+        if (myLockedSeats.length > 0 && !myLockedSeats.includes(seat.seatId)) {
+            return; // can't add new seats to an active lock
+        }
+
         if (selectedSeats.includes(seat.seatId)) {
             setSelectedSeats(selectedSeats.filter((s) => s !== seat.seatId));
         } else {
-            if (selectedSeats.length < showtime.availableSeats) {
+            if (selectedSeats.length < 10) {
                 setSelectedSeats([...selectedSeats, seat.seatId]);
             } else {
-                alert(`You can select up to ${showtime.availableSeats} seats`);
+                alert("You can select up to 10 seats at a time");
             }
+        }
+    };
+
+    // Lock selected seats (called before confirming)
+    const handleLockSeats = async () => {
+        if (selectedSeats.length === 0) {
+            setError("Please choose at least one seat.");
+            return;
+        }
+        setLockError("");
+        try {
+            const res = await API.post("/bookings/lock-seats", {
+                showtimeId,
+                seats: selectedSeats
+            });
+            setMyLockedSeats([...selectedSeats]);
+            setLockExpiry(new Date(res.data.lockExpiresAt));
+            setError("");
+        } catch (err) {
+            console.error(err);
+            setLockError(err.response?.data?.msg || "Failed to lock seats. Try again.");
+            // Refresh seat status
+            fetchShowtime();
         }
     };
 
@@ -94,8 +184,13 @@ function Book() {
                 showtimeId,
                 seats: selectedSeats
             });
+            // Clear lock timer
+            if (timerRef.current) clearInterval(timerRef.current);
+            setLockExpiry(null);
+            setMyLockedSeats([]);
             setSuccess("Booking confirmed!");
             setError("");
+            setLockError("");
             setTimeout(() => {
                 navigate("/my-bookings");
             }, 1000);
@@ -107,22 +202,40 @@ function Book() {
         }
     };
 
+    // Format countdown mm:ss
+    const formatTime = (secs) => {
+        const m = Math.floor(secs / 60);
+        const s = secs % 60;
+        return `${m}:${s.toString().padStart(2, "0")}`;
+    };
+
+    // Are seats locked and ready to confirm?
+    const seatsAreLocked = myLockedSeats.length > 0 && countdown > 0;
+
     return (
         <div className="book-container">
             <button className="back-btn" onClick={() => navigate(-1)}>← Back</button>
             <h2>Book tickets for {showtime.movie.title}</h2>
             <p>
-                {showtime.theater.name} &bull; {showtime.date} at {showtime.time}
+                {showtime.theater.name}, {showtime.theater.area} &bull; {showtime.date} at {showtime.time}
             </p>
             <p>Price per seat: ₹{showtime.price}</p>
-            <p>Seats available: {showtime.availableSeats}</p>
+            <p>Seats available: {availableCount}</p>
             {selectedSeats.length > 0 && (
                 <p className="selection-summary">
                     Selected: {selectedSeats.join(", ")} ({selectedSeats.length} seat{selectedSeats.length > 1 ? "s" : ""}) — Total: ₹{selectedSeats.length * showtime.price}
                 </p>
             )}
 
+            {/* Countdown timer */}
+            {seatsAreLocked && (
+                <div className={`lock-timer ${countdown <= 30 ? "lock-timer-warning" : ""}`}>
+                    🔒 Seats reserved for <strong>{formatTime(countdown)}</strong>
+                </div>
+            )}
+
             {error && <p className="error-text">{error}</p>}
+            {lockError && <p className="error-text">{lockError}</p>}
             {success && <p className="success-text">{success}</p>}
 
             {/* Screen indicator */}
@@ -131,7 +244,7 @@ function Book() {
                 <p className="screen-label">SCREEN THIS WAY</p>
             </div>
 
-            {/* Seat layout — row by row */}
+            {/* Seat layout — row by row from showtime.seats */}
             <div className="seat-layout">
                 {rows.map((row) => (
                     <div key={row.rowLabel} className="seat-row">
@@ -139,12 +252,13 @@ function Book() {
                         <div className="seat-row-seats">
                             {row.seats.map((seat) => {
                                 const isSelected = selectedSeats.includes(seat.seatId);
+                                const isLockedOther = isSeatLockedByOther(seat.seatId);
                                 return (
                                     <div
                                         key={seat.seatId}
-                                        className={`seat ${seat.isBooked ? "booked" : ""} ${isSelected ? "selected" : ""}`}
+                                        className={`seat ${seat.isBooked ? "booked" : ""} ${isSelected ? "selected" : ""} ${isLockedOther ? "locked-other" : ""}`}
                                         onClick={() => handleSeatClick(seat)}
-                                        title={seat.isBooked ? "Already booked" : seat.seatId}
+                                        title={seat.isBooked ? "Already booked" : isLockedOther ? "Held by another user" : seat.seatId}
                                     >
                                         {seat.seatId}
                                     </div>
@@ -161,11 +275,19 @@ function Book() {
                 <span className="legend-item"><span className="legend-box available"></span> Available</span>
                 <span className="legend-item"><span className="legend-box selected"></span> Selected</span>
                 <span className="legend-item"><span className="legend-box booked"></span> Booked</span>
+                <span className="legend-item"><span className="legend-box locked-other"></span> Held</span>
             </div>
 
-            <button className="confirm-btn" onClick={handleConfirm} disabled={bookingLoading || selectedSeats.length === 0}>
-                {bookingLoading ? <span className="spinner"></span> : "Confirm Booking"}
-            </button>
+            {/* Two-step: Lock first, then Confirm */}
+            {!seatsAreLocked ? (
+                <button className="confirm-btn lock-btn" onClick={handleLockSeats} disabled={selectedSeats.length === 0}>
+                    🔒 Reserve Seats
+                </button>
+            ) : (
+                <button className="confirm-btn" onClick={handleConfirm} disabled={bookingLoading || selectedSeats.length === 0}>
+                    {bookingLoading ? <span className="spinner"></span> : "Confirm Booking"}
+                </button>
+            )}
         </div>
     );
 }

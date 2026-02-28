@@ -34,11 +34,31 @@ exports.addMovie = async (req, res) => {
 // HYBRID SEARCH: MongoDB first → if no results, fetch from TMDB and save
 exports.getAllMovies = async (req, res) => {
     try {
-        const { search } = req.query;
+        const { search, sort, genre, language } = req.query;
 
-        // --- Step 1: If no search query, return all movies ---
+        // Build sort option for rating
+        let sortOption = {};
+        if (sort === "asc") sortOption.rating = 1;
+        else if (sort === "desc") sortOption.rating = -1;
+
+        // Build genre filter (if provided)
+        let genreFilter = {};
+        if (genre && genre.trim() !== "") {
+            genreFilter = { genre: { $in: [genre.trim()] } };
+        }
+
+        // Build language filter (if provided, case-insensitive)
+        let languageFilter = {};
+        if (language && language.trim() !== "") {
+            languageFilter = { language: new RegExp(`^${language.trim()}$`, "i") };
+        }
+
+        // Combine all filters
+        const baseFilter = { ...genreFilter, ...languageFilter };
+
+        // --- Step 1: If no search query, return all movies (with optional filters) ---
         if (!search || search.trim() === "") {
-            const movies = await Movie.find();
+            const movies = await Movie.find(baseFilter).sort(sortOption);
             return res.json(movies);
         }
 
@@ -49,9 +69,10 @@ exports.getAllMovies = async (req, res) => {
                 { title: regex },
                 { genre: regex },
                 { language: regex }
-            ]
+            ],
+            ...baseFilter
         };
-        const localMovies = await Movie.find(filter);
+        const localMovies = await Movie.find(filter).sort(sortOption);
 
         if (localMovies.length > 0) {
             // Found in MongoDB → return immediately
@@ -85,6 +106,11 @@ exports.getAllMovies = async (req, res) => {
             // Prevent duplicates: check if tmdbId already exists
             const exists = await Movie.findOne({ tmdbId: m.tmdbId });
             if (exists) {
+                // Fix poster if it's missing or uses a non-TMDB URL
+                if (m.posterUrl && (!exists.posterUrl || !exists.posterUrl.includes("image.tmdb.org"))) {
+                    exists.posterUrl = m.posterUrl;
+                    await exists.save();
+                }
                 savedMovies.push(exists);
                 continue;
             }
@@ -105,7 +131,7 @@ exports.getAllMovies = async (req, res) => {
             // Ensure all required fields have safe defaults before saving
             m.description = m.description || "No description available.";
             m.genre = (m.genre && m.genre.length > 0) ? m.genre : ["Other"];
-            m.language = m.language || "EN";
+            m.language = m.language || "Other";
 
             // Per-movie try/catch so one bad movie doesn't crash the batch
             try {
@@ -113,8 +139,13 @@ exports.getAllMovies = async (req, res) => {
                 await movie.save();
                 savedMovies.push(movie);
             } catch (saveErr) {
-                console.error(`Could not save "${m.title}":`, saveErr.message);
-                // Skip this movie and continue with the rest
+                // Duplicate key (race condition) → find and return the existing movie
+                if (saveErr.code === 11000) {
+                    const existing = await Movie.findOne({ tmdbId: m.tmdbId });
+                    if (existing) savedMovies.push(existing);
+                } else {
+                    console.error(`Could not save "${m.title}":`, saveErr.message);
+                }
             }
         }
 
@@ -224,5 +255,133 @@ exports.syncMoviesFromTMDB = async (req, res) => {
     } catch (err) {
         console.error("TMDB sync error:", err.message);
         res.status(500).json({ msg: "Failed to sync from TMDB. Existing movies still work." });
+    }
+};
+
+// GET SEARCH SUGGESTIONS (local + TMDB, no saving)
+exports.getSuggestions = async (req, res) => {
+    try {
+        const { query } = req.query;
+        if (!query || query.trim().length < 2) {
+            return res.json({ local: [], external: [] });
+        }
+
+        const regex = new RegExp(query.trim(), "i");
+
+        // 1. Search MongoDB (limit 5)
+        const localMovies = await Movie.find({ title: regex })
+            .select("title posterUrl genre rating tmdbId")
+            .limit(5);
+
+        // 2. If local results < 5, fetch from TMDB (don't save)
+        let externalMovies = [];
+        if (localMovies.length < 5) {
+            try {
+                const tmdbResults = await searchMovies(query.trim());
+                // Filter out movies that already exist locally (by tmdbId)
+                const localTmdbIds = localMovies
+                    .filter(m => m.tmdbId)
+                    .map(m => m.tmdbId);
+
+                externalMovies = tmdbResults
+                    .filter(m => !localTmdbIds.includes(m.tmdbId))
+                    .slice(0, 7 - localMovies.length)
+                    .map(m => ({
+                        tmdbId: m.tmdbId,
+                        title: m.title,
+                        posterUrl: m.posterUrl,
+                        genre: m.genre,
+                        rating: m.rating
+                    }));
+            } catch (tmdbErr) {
+                console.error("TMDB suggestion fetch failed:", tmdbErr.message);
+                // Continue with local results only
+            }
+        }
+
+        res.json({ local: localMovies, external: externalMovies });
+    } catch (err) {
+        console.error("Error fetching suggestions:", err);
+        res.status(500).json({ msg: "Server Error" });
+    }
+};
+
+// GET DISTINCT GENRES from all movies in the database
+exports.getGenres = async (req, res) => {
+    try {
+        const genres = await Movie.distinct("genre");
+        // Sort alphabetically for a clean dropdown
+        genres.sort();
+        res.json(genres);
+    } catch (err) {
+        console.error("Error fetching genres:", err);
+        res.status(500).json({ msg: "Server Error" });
+    }
+};
+
+// GET DISTINCT LANGUAGES from all movies in the database
+exports.getLanguages = async (req, res) => {
+    try {
+        const languages = await Movie.distinct("language");
+        languages.sort();
+        res.json(languages);
+    } catch (err) {
+        console.error("Error fetching languages:", err);
+        res.status(500).json({ msg: "Server Error" });
+    }
+};
+
+// GET TRAILER for a movie (fetch from TMDB videos endpoint)
+const axios = require("axios");
+exports.getTrailer = async (req, res) => {
+    try {
+        const movie = await Movie.findById(req.params.id);
+        if (!movie) {
+            return res.status(404).json({ msg: "Movie not found" });
+        }
+
+        // If movie has no tmdbId, we can't fetch a trailer
+        if (!movie.tmdbId) {
+            return res.status(404).json({ msg: "Trailer not available" });
+        }
+
+        // Call TMDB videos endpoint
+        const TMDB_KEY = process.env.TMDB_API_KEY;
+        const url = `https://api.themoviedb.org/3/movie/${movie.tmdbId}/videos?api_key=${TMDB_KEY}&language=en-US`;
+        const tmdbRes = await axios.get(url);
+        const videos = tmdbRes.data.results || [];
+
+        // Find a YouTube trailer
+        const trailer = videos.find(
+            (v) => v.site === "YouTube" && v.type === "Trailer"
+        );
+
+        if (!trailer) {
+            return res.status(404).json({ msg: "Trailer not available" });
+        }
+
+        res.json({ key: trailer.key, name: trailer.name });
+    } catch (err) {
+        console.error("Error fetching trailer:", err.message);
+        res.status(500).json({ msg: "Failed to fetch trailer" });
+    }
+};
+
+// GET NEWLY RELEASED MOVIES (released within last 30 days)
+exports.getNewReleases = async (req, res) => {
+    try {
+        const now = new Date();
+        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const movies = await Movie.find({
+            releaseDate: { $gte: thirtyDaysAgo }
+        })
+            .sort({ releaseDate: -1 })
+            .limit(10);
+
+        res.json(movies);
+    } catch (err) {
+        console.error("Error fetching new releases:", err.message);
+        res.status(500).json({ msg: "Server Error" });
     }
 };

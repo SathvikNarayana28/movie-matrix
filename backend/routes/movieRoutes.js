@@ -7,13 +7,23 @@ const {
     getMovieById,
     updateMovie,
     deleteMovie,
-    syncMoviesFromTMDB
+    syncMoviesFromTMDB,
+    getGenres,
+    getLanguages,
+    getTrailer,
+    getSuggestions,
+    getNewReleases
 } = require("../controllers/movieController");
 
 // Public routes  - anyone can view movies
-router.get("/", getAllMovies);           // GET    /api/movies
-router.get("/sync", syncMoviesFromTMDB); // GET    /api/movies/sync  (fetch from TMDB)
-router.get("/:id", getMovieById);       // GET    /api/movies/:id
+router.get("/", getAllMovies);                // GET    /api/movies
+router.get("/genres", getGenres);             // GET    /api/movies/genres
+router.get("/languages", getLanguages);       // GET    /api/movies/languages
+router.get("/suggestions", getSuggestions);   // GET    /api/movies/suggestions?query=...
+router.get("/new-releases", getNewReleases);  // GET    /api/movies/new-releases
+router.get("/sync", syncMoviesFromTMDB);      // GET    /api/movies/sync
+router.get("/:id/trailer", getTrailer);       // GET    /api/movies/:id/trailer
+router.get("/:id", getMovieById);            // GET    /api/movies/:id
 
 // Protected routes - only logged-in users (later: admin only)
 router.post("/", authMiddleware, addMovie);           // POST   /api/movies

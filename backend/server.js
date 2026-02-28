@@ -40,6 +40,7 @@ app.get("/", (req, res) => {
 const Movie = require("./models/Movie");
 const Theater = require("./models/Theater");
 const Showtime = require("./models/Showtime");
+const { generateSeats } = require("./models/Showtime");
 const { fetchNowPlaying, fetchMovieDetails } = require("./services/tmdbService");
 
 mongoose.connect(process.env.MONGO_URI, {
@@ -84,17 +85,22 @@ mongoose.connect(process.env.MONGO_URI, {
             }
         }
 
-        // --- Seed Theaters ---
+        // --- Seed Theaters (Hyderabad realistic dataset) ---
         const theaterCount = await Theater.countDocuments();
         if (theaterCount === 0) {
-            console.log("Seeding default theaters...");
+            console.log("Seeding Hyderabad theatres...");
             const theaters = [
-                { name: "PVR Cinemas", location: "Hyderabad, Forum Mall", totalSeats: 30 },
-                { name: "INOX Multiplex", location: "Hyderabad, GVK One", totalSeats: 30 },
-                { name: "Cinepolis", location: "Bangalore, Royal Meenakshi Mall", totalSeats: 30 }
+                { name: "AMB Cinemas", city: "Hyderabad", area: "Gachibowli", screens: 4, totalSeatsPerScreen: 100 },
+                { name: "PVR Next Galleria", city: "Hyderabad", area: "Panjagutta", screens: 5, totalSeatsPerScreen: 80 },
+                { name: "Asian Cinemas", city: "Hyderabad", area: "Uppal", screens: 3, totalSeatsPerScreen: 120 },
+                { name: "Prasads Multiplex", city: "Hyderabad", area: "Necklace Road", screens: 6, totalSeatsPerScreen: 100 },
+                { name: "INOX GVK One", city: "Hyderabad", area: "Banjara Hills", screens: 4, totalSeatsPerScreen: 90 },
+                { name: "Cinepolis", city: "Hyderabad", area: "Kompally", screens: 3, totalSeatsPerScreen: 100 },
+                { name: "Sudarshan 35mm", city: "Hyderabad", area: "RTC X Roads", screens: 1, totalSeatsPerScreen: 150 },
+                { name: "Miraj Cinemas", city: "Hyderabad", area: "Kukatpally", screens: 4, totalSeatsPerScreen: 80 }
             ];
             await Theater.insertMany(theaters);
-            console.log("3 default theaters seeded.");
+            console.log(`${theaters.length} Hyderabad theatres seeded.`);
         }
 
         // --- Seed Showtimes (for movies that don't have any yet) ---
@@ -133,6 +139,11 @@ mongoose.connect(process.env.MONGO_URI, {
 
                 // Create showtimes for this movie at each theater
                 for (const theater of allTheaters) {
+                    // Generate seats based on the theatre's totalSeatsPerScreen
+                    const totalSeats = theater.totalSeatsPerScreen || 100;
+                    const seatsPerRow = 10;
+                    const rows = Math.ceil(totalSeats / seatsPerRow);
+
                     for (const date of dates) {
                         const t1 = times[Math.floor(Math.random() * 2)];
                         const t2 = times[2 + Math.floor(Math.random() * 2)];
@@ -142,7 +153,7 @@ mongoose.connect(process.env.MONGO_URI, {
                             date,
                             time: t1,
                             price: 200,
-                            availableSeats: theater.totalSeats
+                            seats: generateSeats(rows, seatsPerRow)
                         });
                         newShowtimes.push({
                             movie: movie._id,
@@ -150,7 +161,7 @@ mongoose.connect(process.env.MONGO_URI, {
                             date,
                             time: t2,
                             price: 250,
-                            availableSeats: theater.totalSeats
+                            seats: generateSeats(rows, seatsPerRow)
                         });
                     }
                 }

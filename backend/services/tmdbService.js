@@ -22,6 +22,30 @@ const GENRE_MAP = {
     37: "Western"
 };
 
+// TMDB language codes → full readable names
+const LANGUAGE_MAP = {
+    en: "English",
+    hi: "Hindi",
+    te: "Telugu",
+    ta: "Tamil",
+    kn: "Kannada",
+    ml: "Malayalam",
+    mr: "Marathi",
+    bn: "Bengali",
+    pa: "Punjabi",
+    gu: "Gujarati",
+    ur: "Urdu",
+    ko: "Korean",
+    ja: "Japanese",
+    zh: "Chinese",
+    fr: "French",
+    es: "Spanish",
+    de: "German",
+    it: "Italian",
+    pt: "Portuguese",
+    ru: "Russian"
+};
+
 /**
  * Fetch "Now Playing" movies from TMDB (page 1 = ~20 movies).
  * Returns an array of objects shaped to match our Movie schema.
@@ -36,7 +60,7 @@ async function fetchNowPlaying() {
         tmdbId: String(m.id),
         title: m.title,
         genre: (m.genre_ids || []).map(id => GENRE_MAP[id] || "Other"),
-        language: (m.original_language || "en").toUpperCase(),
+        language: LANGUAGE_MAP[m.original_language] || "Other",
         duration: 0,                                  // TMDB list doesn't include runtime
         releaseDate: m.release_date || "2026-01-01",
         rating: m.vote_average || 0,
@@ -102,7 +126,7 @@ async function searchMovies(query) {
             tmdbId: String(m.id),
             title: m.title,
             genre: (m.genre_ids || []).map(id => GENRE_MAP[id] || "Other"),
-            language: (m.original_language || "en").toUpperCase(),
+            language: LANGUAGE_MAP[m.original_language] || "Other",
             duration: 0,
             releaseDate: m.release_date || "2026-01-01",
             rating: m.vote_average || 0,

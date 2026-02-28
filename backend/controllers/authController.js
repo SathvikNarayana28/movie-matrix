@@ -69,3 +69,38 @@ exports.getProfile = async (req, res) => {
         res.status(500).json({ msg: "Server Error" });
     }
 };
+
+// RESET PASSWORD (logged-in user only)
+exports.resetPassword = async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        // 1. Validate inputs
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ msg: "Current password and new password are required" });
+        }
+        if (newPassword.length < 6) {
+            return res.status(400).json({ msg: "New password must be at least 6 characters" });
+        }
+
+        // 2. Find user by JWT id (includes password field)
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ msg: "User not found" });
+
+        // 3. Verify current password
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ msg: "Current password is incorrect" });
+        }
+
+        // 4. Hash new password and save
+        user.password = await bcrypt.hash(newPassword, 10);
+        await user.save();
+
+        res.json({ msg: "Password updated successfully" });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: "Server Error" });
+    }
+};

@@ -17,6 +17,7 @@ function Login() {
             const res = await API.post("/auth/login", { email, password });
             localStorage.setItem("token", res.data.token);
             localStorage.setItem("role", res.data.user?.role || "user");
+            localStorage.setItem("userId", res.data.user?.id || "");
             const userRole = res.data.user?.role || "user";
             if (userRole === "admin") {
                 navigate("/admin");

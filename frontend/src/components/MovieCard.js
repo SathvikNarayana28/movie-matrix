@@ -19,7 +19,7 @@ function MovieCard({ movie, isFavorite, onToggleFavorite }) {
                 alt={movie.title}
                 className="movie-poster"
                 onError={(e) => {
-                    e.target.src = "https://via.placeholder.com/300x450?text=No+Poster";
+                    e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='450' fill='%23ccc'%3E%3Crect width='300' height='450' fill='%23222'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666' font-size='20'%3ENo Poster%3C/text%3E%3C/svg%3E";
                 }}
             />
             <div className="movie-info">

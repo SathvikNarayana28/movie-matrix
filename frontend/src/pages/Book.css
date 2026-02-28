@@ -153,6 +153,45 @@
     border-color: #999;
 }
 
+.legend-box.locked-other {
+    background-color: #ff9800;
+    border-color: #ff9800;
+}
+
+/* ========== SEAT LOCK STYLES ========== */
+.seat.locked-other {
+    background-color: #ff9800;
+    color: #fff;
+    cursor: not-allowed;
+    border-color: #e68a00;
+    opacity: 0.85;
+}
+
+.lock-timer {
+    text-align: center;
+    padding: 10px 16px;
+    background: #e8f5e9;
+    border: 1px solid #4caf50;
+    border-radius: 6px;
+    color: #2e7d32;
+    font-size: 15px;
+    margin: 10px 0;
+}
+
+.lock-timer-warning {
+    background: #fff3e0;
+    border-color: #ff9800;
+    color: #e65100;
+}
+
+.lock-btn {
+    background-color: #1a1a2e !important;
+}
+
+.lock-btn:hover:not(:disabled) {
+    background-color: #2d2d50 !important;
+}
+
 /* ========== CONFIRM BUTTON ========== */
 .confirm-btn {
     display: block;

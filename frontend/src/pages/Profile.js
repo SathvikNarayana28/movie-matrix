@@ -10,6 +10,15 @@ function Profile() {
     const [error, setError] = useState("");
     const navigate = useNavigate();
 
+    // Reset Password state
+    const [showResetForm, setShowResetForm] = useState(false);
+    const [currentPassword, setCurrentPassword] = useState("");
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
+    const [resetMsg, setResetMsg] = useState("");
+    const [resetError, setResetError] = useState("");
+    const [resetLoading, setResetLoading] = useState(false);
+
     useEffect(() => {
         const token = localStorage.getItem("token");
         if (!token) {
@@ -38,6 +47,40 @@ function Profile() {
     if (error) return <p className="error-text">{error}</p>;
     if (!user) return <p className="error-text">User not found</p>;
 
+    const handleResetPassword = async (e) => {
+        e.preventDefault();
+        setResetMsg("");
+        setResetError("");
+
+        // Client-side validation
+        if (newPassword.length < 6) {
+            setResetError("New password must be at least 6 characters");
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            setResetError("New password and confirm password do not match");
+            return;
+        }
+
+        setResetLoading(true);
+        try {
+            const res = await API.put("/auth/reset-password", {
+                currentPassword,
+                newPassword
+            });
+            setResetMsg(res.data.msg);
+            setCurrentPassword("");
+            setNewPassword("");
+            setConfirmPassword("");
+            // Auto-hide form after success
+            setTimeout(() => setShowResetForm(false), 2000);
+        } catch (err) {
+            setResetError(err.response?.data?.msg || "Failed to reset password");
+        } finally {
+            setResetLoading(false);
+        }
+    };
+
     return (
         <div className="profile-page">
             <div className="profile-card">
@@ -59,6 +102,47 @@ function Profile() {
                         <span className="stat-number">{user.favorites ? user.favorites.length : 0}</span>
                         <span className="stat-label">Favorites</span>
                     </div>
+                </div>
+
+                {/* Reset Password Section */}
+                <div className="reset-password-section">
+                    <button
+                        className="reset-toggle-btn"
+                        onClick={() => { setShowResetForm(!showResetForm); setResetMsg(""); setResetError(""); }}
+                    >
+                        {showResetForm ? "Cancel" : "Reset Password"}
+                    </button>
+
+                    {showResetForm && (
+                        <form className="reset-form" onSubmit={handleResetPassword}>
+                            {resetMsg && <p className="reset-msg success">{resetMsg}</p>}
+                            {resetError && <p className="reset-msg error">{resetError}</p>}
+                            <input
+                                type="password"
+                                placeholder="Current Password"
+                                value={currentPassword}
+                                onChange={(e) => setCurrentPassword(e.target.value)}
+                                required
+                            />
+                            <input
+                                type="password"
+                                placeholder="New Password"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                required
+                            />
+                            <input
+                                type="password"
+                                placeholder="Confirm New Password"
+                                value={confirmPassword}
+                                onChange={(e) => setConfirmPassword(e.target.value)}
+                                required
+                            />
+                            <button type="submit" className="reset-submit-btn" disabled={resetLoading}>
+                                {resetLoading ? "Updating..." : "Update Password"}
+                            </button>
+                        </form>
+                    )}
                 </div>
             </div>
         </div>

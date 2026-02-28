@@ -70,3 +70,88 @@
     font-size: 13px;
     color: #888;
 }
+
+/* ========== Reset Password Section ========== */
+.reset-password-section {
+    margin-top: 20px;
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+}
+
+.reset-toggle-btn {
+    padding: 8px 20px;
+    background-color: #1a1a2e;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.reset-toggle-btn:hover {
+    background-color: #2d2d50;
+}
+
+.reset-form {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+}
+
+.reset-form input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 14px;
+    outline: none;
+    box-sizing: border-box;
+    font-family: inherit;
+}
+
+.reset-form input:focus {
+    border-color: #e94560;
+}
+
+.reset-submit-btn {
+    padding: 10px;
+    background-color: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.reset-submit-btn:hover:not(:disabled) {
+    background-color: #d13350;
+}
+
+.reset-submit-btn:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
+
+.reset-msg {
+    text-align: center;
+    padding: 8px 12px;
+    border-radius: 4px;
+    font-size: 13px;
+    margin: 0;
+}
+
+.reset-msg.success {
+    background-color: #e0ffe0;
+    color: #008800;
+}
+
+.reset-msg.error {
+    background-color: #ffe0e0;
+    color: #cc0000;
+}
