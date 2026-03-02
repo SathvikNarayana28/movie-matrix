@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path = require("path");
 require("dotenv").config();
 
 const authRoutes = require("./routes/authRoutes");
@@ -10,6 +11,7 @@ const showtimeRoutes = require("./routes/showtimeRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const favoriteRoutes = require("./routes/favoriteRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const paymentRoutes = require("./routes/paymentRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
 
 const app = express();   // <-- app is created HERE
@@ -25,13 +27,19 @@ app.use("/api/showtimes", showtimeRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/favorites", favoriteRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Protected route (NOW it is after app creation)
 app.get("/api/protected", authMiddleware, (req, res) => {
     res.json({ msg: "You have accessed a protected route!", user: req.user });
 });
 
-// Test route
+// In production, serve React frontend build
+if (process.env.NODE_ENV === "production") {
+    app.use(express.static(path.join(__dirname, "..", "frontend", "build")));
+}
+
+// Test route (only shows if no frontend build)
 app.get("/", (req, res) => {
     res.send("Backend running");
 });
@@ -181,4 +189,12 @@ mongoose.connect(process.env.MONGO_URI, {
 
 
 
-app.listen(5000, () => console.log("Server started on port 5000"));
+// In production, serve React app for any unknown route (client-side routing)
+if (process.env.NODE_ENV === "production") {
+    app.get("*", (req, res) => {
+        res.sendFile(path.join(__dirname, "..", "frontend", "build", "index.html"));
+    });
+}
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`Server started on port ${PORT}`));

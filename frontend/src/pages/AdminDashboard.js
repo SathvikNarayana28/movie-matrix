@@ -95,7 +95,7 @@ function AdminDashboard() {
 
     const fetchMovies = async () => {
         try {
-            const res = await API.get("/movies");
+            const res = await API.get("/admin/movies");
             setMovies(res.data);
         } catch (err) {
             console.error("Failed to fetch movies");

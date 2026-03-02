@@ -1,8 +1,12 @@
 import axios from "axios";
 
-// allow overriding base URL via env (useful for deploys or proxies)
+// Auto-detect API base URL:
+//   - In development (localhost): hit the local backend at port 5000
+//   - In production: use relative /api (same origin, served by backend)
+const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+
 const API = axios.create({
-    baseURL: process.env.REACT_APP_API_BASE_URL || "http://localhost:5000/api"
+    baseURL: process.env.REACT_APP_API_BASE_URL || (isLocalhost ? "http://localhost:5000/api" : "/api")
 });
 
 // log if baseURL not reachable (optional)

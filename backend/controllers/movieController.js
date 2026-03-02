@@ -56,9 +56,9 @@ exports.getAllMovies = async (req, res) => {
         // Combine all filters
         const baseFilter = { ...genreFilter, ...languageFilter };
 
-        // --- Step 1: If no search query, return all movies (with optional filters) ---
+        // --- Step 1: If no search query, return all "now showing" movies (with optional filters) ---
         if (!search || search.trim() === "") {
-            const movies = await Movie.find(baseFilter).sort(sortOption);
+            const movies = await Movie.find({ ...baseFilter, nowShowing: true }).sort(sortOption);
             return res.json(movies);
         }
 

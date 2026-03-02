@@ -19,6 +19,14 @@ const BookingSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
+    paymentId: {
+        type: String,
+        default: null
+    },
+    orderId: {
+        type: String,
+        default: null
+    },
     status: {
         type: String,
         enum: ["confirmed", "cancelled"],              // only these 2 values allowed

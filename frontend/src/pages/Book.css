@@ -83,7 +83,7 @@
 .seat {
     width: 42px;
     height: 36px;
-    border: 1px solid #ccc;
+    border: 1px solid #388e3c;
     border-radius: 6px;
     display: flex;
     align-items: center;
@@ -91,28 +91,28 @@
     font-size: 12px;
     font-weight: 500;
     cursor: pointer;
-    background-color: #f0f0f0;
-    color: #333;
+    background-color: #4caf50;
+    color: #fff;
     transition: background-color 0.15s, transform 0.1s;
     user-select: none;
 }
 
-.seat:hover:not(.booked) {
-    background-color: #ddd;
+.seat:hover:not(.booked):not(.locked-other) {
+    background-color: #43a047;
     transform: scale(1.08);
 }
 
 .seat.selected {
-    background-color: #e94560;
+    background-color: #1e88e5;
     color: #fff;
-    border-color: #e94560;
+    border-color: #1565c0;
 }
 
 .seat.booked {
-    background-color: #999;
-    color: #ccc;
+    background-color: #e53935;
+    color: #ffcdd2;
     cursor: not-allowed;
-    border-color: #999;
+    border-color: #c62828;
 }
 
 /* ========== LEGEND ========== */
@@ -140,17 +140,18 @@
 }
 
 .legend-box.available {
-    background-color: #f0f0f0;
+    background-color: #4caf50;
+    border-color: #388e3c;
 }
 
 .legend-box.selected {
-    background-color: #e94560;
-    border-color: #e94560;
+    background-color: #1e88e5;
+    border-color: #1565c0;
 }
 
 .legend-box.booked {
-    background-color: #999;
-    border-color: #999;
+    background-color: #e53935;
+    border-color: #c62828;
 }
 
 .legend-box.locked-other {

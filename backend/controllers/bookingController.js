@@ -1,5 +1,7 @@
 const Booking = require("../models/Booking");
 const Showtime = require("../models/Showtime");
+const User = require("../models/User");
+const sendBookingEmail = require("../utils/sendEmail");
 
 // LOCK SEATS — temporary 2-minute lock
 exports.lockSeats = async (req, res) => {
@@ -108,7 +110,7 @@ exports.unlockSeats = async (req, res) => {
 // BOOK TICKETS
 exports.bookTickets = async (req, res) => {
     try {
-        const { showtimeId, seats } = req.body;
+        const { showtimeId, seats, paymentId, orderId } = req.body;
         // req.user.id comes from the JWT auth middleware
 
         // 1. Find the showtime
@@ -155,7 +157,9 @@ exports.bookTickets = async (req, res) => {
             user: req.user.id,
             showtime: showtimeId,
             seats,
-            totalPrice
+            totalPrice,
+            paymentId: paymentId || null,
+            orderId: orderId || null
         });
 
         await booking.save();
@@ -173,6 +177,30 @@ exports.bookTickets = async (req, res) => {
 
         showtime.markModified("seats");
         await showtime.save();
+
+        // 6. Send confirmation email (non-blocking — booking stays even if email fails)
+        try {
+            const user = await User.findById(req.user.id);
+            // Populate movie and theater names for the email
+            const populatedShowtime = await Showtime.findById(showtimeId)
+                .populate("movie", "title")
+                .populate("theater", "name area city");
+
+            if (user && user.email && populatedShowtime) {
+                sendBookingEmail(user.email, {
+                    movieName: populatedShowtime.movie?.title || "Unknown Movie",
+                    theaterName: `${populatedShowtime.theater?.name || "Unknown"} — ${populatedShowtime.theater?.area || ""}, ${populatedShowtime.theater?.city || ""}`,
+                    date: populatedShowtime.date,
+                    time: populatedShowtime.time,
+                    seats: seats,
+                    totalPrice: totalPrice
+                }).catch(emailErr => {
+                    console.error("❌ Email send failed (booking is still confirmed):", emailErr.message);
+                });
+            }
+        } catch (emailLookupErr) {
+            console.error("❌ Email lookup failed (booking is still confirmed):", emailLookupErr.message);
+        }
 
         res.status(201).json({ msg: "Booking confirmed!", booking });
 

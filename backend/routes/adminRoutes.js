@@ -174,6 +174,17 @@ router.post("/movies", async (req, res) => {
     }
 });
 
+// GET ALL MOVIES (admin — no nowShowing filter)
+router.get("/movies", async (req, res) => {
+    try {
+        const movies = await Movie.find().sort({ createdAt: -1 });
+        res.json(movies);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ msg: "Server Error" });
+    }
+});
+
 // DELETE MOVIE
 router.delete("/movies/:id", async (req, res) => {
     try {

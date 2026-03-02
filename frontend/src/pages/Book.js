@@ -173,31 +173,115 @@ function Book() {
         }
     };
 
+    // Load Razorpay checkout script dynamically
+    const loadRazorpayScript = () => {
+        return new Promise((resolve) => {
+            if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+                resolve(true);
+                return;
+            }
+            const script = document.createElement("script");
+            script.src = "https://checkout.razorpay.com/v1/checkout.js";
+            script.onload = () => resolve(true);
+            script.onerror = () => resolve(false);
+            document.body.appendChild(script);
+        });
+    };
+
     const handleConfirm = async () => {
         if (selectedSeats.length === 0) {
             setError("Please choose at least one seat.");
             return;
         }
         setBookingLoading(true);
+        setError("");
+
         try {
-            await API.post("/bookings", {
-                showtimeId,
-                seats: selectedSeats
+            // 1. Load Razorpay script
+            const scriptLoaded = await loadRazorpayScript();
+            if (!scriptLoaded) {
+                setError("Failed to load payment gateway. Check your internet connection.");
+                setBookingLoading(false);
+                return;
+            }
+
+            const totalAmount = selectedSeats.length * showtime.price;
+
+            // 2. Create Razorpay order on backend
+            const orderRes = await API.post("/payment/create-order", { amount: totalAmount });
+            const { orderId, keyId } = orderRes.data;
+
+            // 3. Open Razorpay checkout popup
+            const options = {
+                key: keyId,
+                amount: totalAmount * 100,  // in paise
+                currency: "INR",
+                name: "Movie Matrix",
+                description: `${selectedSeats.length} seat(s) — ${showtime.movie.title}`,
+                order_id: orderId,
+                handler: async function (response) {
+                    // 4. Verify payment on backend
+                    try {
+                        const verifyRes = await API.post("/payment/verify", {
+                            razorpay_order_id: response.razorpay_order_id,
+                            razorpay_payment_id: response.razorpay_payment_id,
+                            razorpay_signature: response.razorpay_signature
+                        });
+
+                        if (verifyRes.data.verified) {
+                            // 5. Confirm booking with payment details
+                            await API.post("/bookings", {
+                                showtimeId,
+                                seats: selectedSeats,
+                                paymentId: response.razorpay_payment_id,
+                                orderId: response.razorpay_order_id
+                            });
+
+                            // Clear lock timer
+                            if (timerRef.current) clearInterval(timerRef.current);
+                            setLockExpiry(null);
+                            setMyLockedSeats([]);
+                            setSuccess("Payment successful! Booking confirmed!");
+                            setError("");
+                            setLockError("");
+                            setTimeout(() => {
+                                navigate("/my-bookings");
+                            }, 1500);
+                        } else {
+                            setError("Payment verification failed. Please contact support.");
+                        }
+                    } catch (verifyErr) {
+                        console.error(verifyErr);
+                        setError("Payment verification failed. If amount was deducted, contact support.");
+                    } finally {
+                        setBookingLoading(false);
+                    }
+                },
+                prefill: {
+                    name: localStorage.getItem("username") || "",
+                    email: localStorage.getItem("email") || ""
+                },
+                theme: {
+                    color: "#e50914"
+                },
+                modal: {
+                    ondismiss: function () {
+                        setBookingLoading(false);
+                        setError("Payment cancelled. Your seats are still reserved.");
+                    }
+                }
+            };
+
+            const razorpay = new window.Razorpay(options);
+            razorpay.on("payment.failed", function (response) {
+                setError(`Payment failed: ${response.error.description}`);
+                setBookingLoading(false);
             });
-            // Clear lock timer
-            if (timerRef.current) clearInterval(timerRef.current);
-            setLockExpiry(null);
-            setMyLockedSeats([]);
-            setSuccess("Booking confirmed!");
-            setError("");
-            setLockError("");
-            setTimeout(() => {
-                navigate("/my-bookings");
-            }, 1000);
+            razorpay.open();
+
         } catch (err) {
             console.error(err);
-            setError(err.response?.data?.msg || "Booking failed");
-        } finally {
+            setError(err.response?.data?.msg || "Payment initiation failed");
             setBookingLoading(false);
         }
     };
@@ -285,7 +369,7 @@ function Book() {
                 </button>
             ) : (
                 <button className="confirm-btn" onClick={handleConfirm} disabled={bookingLoading || selectedSeats.length === 0}>
-                    {bookingLoading ? <span className="spinner"></span> : "Confirm Booking"}
+                    {bookingLoading ? <span className="spinner"></span> : `Pay ₹${selectedSeats.length * showtime.price}`}
                 </button>
             )}
         </div>
