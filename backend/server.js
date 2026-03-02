@@ -191,7 +191,7 @@ mongoose.connect(process.env.MONGO_URI, {
 
 // In production, serve React app for any unknown route (client-side routing)
 if (process.env.NODE_ENV === "production") {
-    app.get("*", (req, res) => {
+    app.get("/{*splat}", (req, res) => {
         res.sendFile(path.join(__dirname, "..", "frontend", "build", "index.html"));
     });
 }
