@@ -52,6 +52,86 @@
 }
 
 /* ========== Theatres Near You Section ========== */
+
+/* ========== AI Recommendations Section ========== */
+.recommendations-section {
+    margin-bottom: 36px;
+}
+
+.recommendations-scroll {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+    scroll-behavior: smooth;
+}
+
+.recommendations-scroll::-webkit-scrollbar {
+    height: 6px;
+}
+.recommendations-scroll::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.rec-card {
+    flex: 0 0 200px;
+    background: #1a1a2e;
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.rec-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 6px 20px rgba(229, 9, 20, 0.25);
+}
+
+.rec-poster {
+    width: 100%;
+    height: 260px;
+    object-fit: cover;
+}
+
+.rec-info {
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.rec-title {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.rec-score {
+    font-size: 0.78rem;
+    color: #4caf50;
+    font-weight: 600;
+}
+
+.rec-showtime {
+    font-size: 0.75rem;
+    color: #90caf9;
+}
+
+.rec-reason {
+    font-size: 0.72rem;
+    color: #aaa;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* ========== Theatres Near You (continued) ========== */
 .nearby-section {
     margin-bottom: 36px;
 }

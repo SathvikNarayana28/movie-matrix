@@ -1,6 +1,7 @@
 import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
+import AiChat from "./components/AiChat";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -28,6 +29,7 @@ function App() {
                 {/* catch-all to avoid blank screens when unknown path */}
                 <Route path="*" element={<p style={{padding: '20px', textAlign:'center'}}>Page not found</p>} />
             </Routes>
+            <AiChat />
         </BrowserRouter>
     );
 }

@@ -17,6 +17,7 @@ function Home() {
     const [newReleases, setNewReleases] = useState([]);
     const [nearbyTheatres, setNearbyTheatres] = useState([]);
     const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem("selectedCity") || "Hyderabad");
+    const [recommendations, setRecommendations] = useState([]);
 
     // --- Suggestions state ---
     const [suggestions, setSuggestions] = useState({ local: [], external: [] });
@@ -59,7 +60,7 @@ function Home() {
         }
     }, []);
 
-    // Load genres and favorites once on mount
+    // Load genres, favorites, and recommendations once on mount
     useEffect(() => {
         fetchFavorites();
         // Fetch distinct genres for the dropdown
@@ -70,6 +71,13 @@ function Home() {
         API.get("/movies/new-releases")
             .then((res) => setNewReleases(res.data))
             .catch((err) => console.error("Error fetching new releases:", err));
+        // Fetch AI-powered recommendations (only if logged in)
+        const token = localStorage.getItem("token");
+        if (token) {
+            API.get("/ai/recommend")
+                .then((res) => setRecommendations(res.data.recommendations || []))
+                .catch((err) => console.error("Error fetching recommendations:", err));
+        }
     }, [fetchFavorites]);
 
     // Fetch nearby theatres whenever selectedCity changes
@@ -187,6 +195,41 @@ function Home() {
             )}
 
             <h2 className="home-heading">🎬 Now Showing</h2>
+
+            {/* ===== AI Recommended For You ===== */}
+            {recommendations.length > 0 && (
+                <div className="recommendations-section">
+                    <h2 className="home-heading">🤖 Recommended For You</h2>
+                    <div className="recommendations-scroll">
+                        {recommendations.map((rec, idx) => (
+                            <div
+                                key={idx}
+                                className="rec-card"
+                                onClick={() => rec.suggestedShowtime
+                                    ? navigate(`/book/${rec.suggestedShowtime.showtimeId}`)
+                                    : navigate(`/movie/${rec.movie._id}`)}
+                            >
+                                <img
+                                    src={rec.movie.posterUrl}
+                                    alt={rec.movie.title}
+                                    className="rec-poster"
+                                    onError={(e) => { e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='180'%3E%3Crect width='120' height='180' fill='%23222'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666' font-size='14'%3EN/A%3C/text%3E%3C/svg%3E"; }}
+                                />
+                                <div className="rec-info">
+                                    <span className="rec-title">{rec.movie.title}</span>
+                                    <span className="rec-score">Match: {Math.round(rec.score * 100)}%</span>
+                                    {rec.suggestedShowtime && (
+                                        <span className="rec-showtime">
+                                            📍 {rec.suggestedShowtime.theater} • {rec.suggestedShowtime.time}
+                                        </span>
+                                    )}
+                                    <span className="rec-reason">{rec.reason}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* ===== Theatres Near You Section ===== */}
             <div className="nearby-section">
