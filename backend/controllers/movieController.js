@@ -79,14 +79,14 @@ exports.getAllMovies = async (req, res) => {
             return res.json(localMovies);
         }
 
-        // --- Step 3: Nothing in MongoDB → search TMDB ---
-        console.log(`No local results for "${search}". Searching TMDB...`);
+        // --- Step 3: Nothing in MongoDB → search TMDB (read-only, no saving) ---
+        // Only admins can add movies. Search results are returned but NOT saved to DB.
+        console.log(`No local results for "${search}". Searching TMDB (read-only)...`);
         let tmdbResults = [];
         try {
             tmdbResults = await searchMovies(search.trim());
         } catch (tmdbErr) {
             console.error("TMDB search failed:", tmdbErr.message);
-            // TMDB down → return empty array (no crash)
             return res.json([]);
         }
 
@@ -94,63 +94,27 @@ exports.getAllMovies = async (req, res) => {
             return res.json([]);
         }
 
-        // --- Step 4: Save new movies to MongoDB (skip duplicates via tmdbId) ---
-        // Limit to first 10 results to keep search fast
-        const limitedResults = tmdbResults.slice(0, 10);
-        const savedMovies = [];
+        // Return TMDB results as preview data (not persisted)
+        const previewMovies = tmdbResults.slice(0, 10).filter(m => m.posterUrl).map(m => ({
+            _id: `tmdb_${m.tmdbId}`,  // temporary ID so frontend can identify it
+            tmdbId: m.tmdbId,
+            title: m.title,
+            genre: (m.genre && m.genre.length > 0) ? m.genre : ["Other"],
+            language: m.language || "Other",
+            duration: m.duration || 120,
+            releaseDate: m.releaseDate,
+            rating: m.rating || 0,
+            description: m.description || "No description available.",
+            posterUrl: m.posterUrl,
+            trailerUrl: m.trailerUrl || "",
+            cast: m.cast || [],
+            director: m.director || "",
+            nowShowing: false,
+            isPreview: true  // flag so frontend knows this isn't bookable
+        }));
 
-        for (const m of limitedResults) {
-            // Skip movies without a poster (required by schema)
-            if (!m.posterUrl) continue;
-
-            // Prevent duplicates: check if tmdbId already exists
-            const exists = await Movie.findOne({ tmdbId: m.tmdbId });
-            if (exists) {
-                // Fix poster if it's missing or uses a non-TMDB URL
-                if (m.posterUrl && (!exists.posterUrl || !exists.posterUrl.includes("image.tmdb.org"))) {
-                    exists.posterUrl = m.posterUrl;
-                    await exists.save();
-                }
-                savedMovies.push(exists);
-                continue;
-            }
-
-            // Try to fetch detailed info (runtime, cast, director, trailer)
-            try {
-                const details = await fetchMovieDetails(m.tmdbId);
-                m.duration = details.duration || 120;
-                m.cast = details.cast || [];
-                m.director = details.director || "";
-                m.trailerUrl = details.trailerUrl || "";
-                if (details.genre && details.genre.length > 0) m.genre = details.genre;
-            } catch (detailErr) {
-                // Use basic data if detail fetch fails
-                m.duration = m.duration || 120;
-            }
-
-            // Ensure all required fields have safe defaults before saving
-            m.description = m.description || "No description available.";
-            m.genre = (m.genre && m.genre.length > 0) ? m.genre : ["Other"];
-            m.language = m.language || "Other";
-
-            // Per-movie try/catch so one bad movie doesn't crash the batch
-            try {
-                const movie = new Movie(m);
-                await movie.save();
-                savedMovies.push(movie);
-            } catch (saveErr) {
-                // Duplicate key (race condition) → find and return the existing movie
-                if (saveErr.code === 11000) {
-                    const existing = await Movie.findOne({ tmdbId: m.tmdbId });
-                    if (existing) savedMovies.push(existing);
-                } else {
-                    console.error(`Could not save "${m.title}":`, saveErr.message);
-                }
-            }
-        }
-
-        console.log(`${savedMovies.length} movie(s) returned from TMDB search.`);
-        return res.json(savedMovies);
+        console.log(`${previewMovies.length} TMDB preview(s) returned (not saved).`);
+        return res.json(previewMovies);
 
     } catch (err) {
         console.error(err);

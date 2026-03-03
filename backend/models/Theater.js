@@ -5,7 +5,9 @@ const TheaterSchema = new mongoose.Schema({
     city: { type: String, required: true },                // e.g. "Hyderabad"
     area: { type: String, required: true },                // e.g. "Gachibowli"
     screens: { type: Number, required: true },             // e.g. 4
-    totalSeatsPerScreen: { type: Number, required: true }  // e.g. 100
+    totalSeatsPerScreen: { type: Number, required: true }, // e.g. 100
+    lat: { type: Number },                                 // latitude
+    lng: { type: Number }                                  // longitude
 }, { timestamps: true });
 
 module.exports = mongoose.model("Theater", TheaterSchema);

@@ -3,17 +3,19 @@ import { Link } from "react-router-dom";
 import "./MovieCard.css";
 
 function MovieCard({ movie, isFavorite, onToggleFavorite }) {
+    const isPreview = movie.isPreview || (movie._id && String(movie._id).startsWith("tmdb_"));
 
     const handleHeartClick = (e) => {
         e.preventDefault();   // prevent navigating to movie detail
         e.stopPropagation();
+        if (isPreview) return; // can't favorite a preview movie
         if (onToggleFavorite) {
             onToggleFavorite(movie._id);
         }
     };
 
-    return (
-        <Link to={`/movie/${movie._id}`} className="movie-card">
+    const cardContent = (
+        <>
             <img
                 src={movie.posterUrl}
                 alt={movie.title}
@@ -30,14 +32,28 @@ function MovieCard({ movie, isFavorite, onToggleFavorite }) {
                     <span className="movie-language">{movie.language}</span>
                 </div>
             </div>
-            {/* Heart icon at top-right of the card */}
-            <button
-                className={`card-heart-btn ${isFavorite ? "heart-active" : ""}`}
-                onClick={handleHeartClick}
-                title={isFavorite ? "Remove from favorites" : "Add to favorites"}
-            >
-                {isFavorite ? "❤️" : "🤍"}
-            </button>
+            {isPreview && (
+                <span className="preview-badge">Not Available</span>
+            )}
+            {!isPreview && (
+                <button
+                    className={`card-heart-btn ${isFavorite ? "heart-active" : ""}`}
+                    onClick={handleHeartClick}
+                    title={isFavorite ? "Remove from favorites" : "Add to favorites"}
+                >
+                    {isFavorite ? "❤️" : "🤍"}
+                </button>
+            )}
+        </>
+    );
+
+    if (isPreview) {
+        return <div className="movie-card preview-card">{cardContent}</div>;
+    }
+
+    return (
+        <Link to={`/movie/${movie._id}`} className="movie-card">
+            {cardContent}
         </Link>
     );
 }

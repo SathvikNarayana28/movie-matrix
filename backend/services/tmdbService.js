@@ -141,4 +141,87 @@ async function searchMovies(query) {
     return movies;
 }
 
-module.exports = { fetchNowPlaying, fetchMovieDetails, searchMovies };
+module.exports = { fetchNowPlaying, fetchMovieDetails, searchMovies, fetchTrending, fetchWatchProviders, discoverMoviesByGenre };
+
+/**
+ * Fetch trending movies from TMDB (weekly).
+ * Returns top 15 trending movies globally.
+ */
+async function fetchTrending() {
+    const url = `${TMDB_BASE}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US`;
+    const res = await axios.get(url);
+    const results = (res.data.results || []).slice(0, 15);
+
+    return results
+        .filter(m => m.title && m.poster_path)
+        .map(m => ({
+            tmdbId: String(m.id),
+            title: m.title,
+            genre: (m.genre_ids || []).map(id => GENRE_MAP[id] || "Other"),
+            language: LANGUAGE_MAP[m.original_language] || "Other",
+            releaseDate: m.release_date || "",
+            rating: m.vote_average || 0,
+            description: m.overview || "",
+            posterUrl: `${TMDB_IMG}${m.poster_path}`
+        }));
+}
+
+/**
+ * Discover movies by genre ID from TMDB (sorted by popularity).
+ * genreId: TMDB genre ID (e.g., 28 for Action)
+ */
+async function discoverMoviesByGenre(genreId) {
+    const url = `${TMDB_BASE}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=popularity.desc&with_genres=${genreId}&page=1`;
+    const res = await axios.get(url);
+    const results = (res.data.results || []).slice(0, 10);
+
+    return results
+        .filter(m => m.title && m.poster_path)
+        .map(m => ({
+            tmdbId: String(m.id),
+            title: m.title,
+            genre: (m.genre_ids || []).map(id => GENRE_MAP[id] || "Other"),
+            language: LANGUAGE_MAP[m.original_language] || "Other",
+            releaseDate: m.release_date || "",
+            rating: m.vote_average || 0,
+            description: m.overview || "",
+            posterUrl: `${TMDB_IMG}${m.poster_path}`
+        }));
+}
+
+/**
+ * Fetch OTT/streaming watch providers for a movie from TMDB.
+ * Returns providers for India (IN) region by default.
+ */
+async function fetchWatchProviders(tmdbId, region = "IN") {
+    const url = `${TMDB_BASE}/movie/${tmdbId}/watch/providers?api_key=${TMDB_KEY}`;
+    const res = await axios.get(url);
+    const regionData = res.data.results?.[region] || res.data.results?.["US"] || {};
+
+    const providers = [];
+
+    // Flatrate = subscription streaming (Netflix, Prime, etc.)
+    if (regionData.flatrate) {
+        for (const p of regionData.flatrate) {
+            providers.push({ name: p.provider_name, type: "Streaming" });
+        }
+    }
+    // Rent
+    if (regionData.rent) {
+        for (const p of regionData.rent) {
+            if (!providers.find(x => x.name === p.provider_name)) {
+                providers.push({ name: p.provider_name, type: "Rent" });
+            }
+        }
+    }
+    // Buy
+    if (regionData.buy) {
+        for (const p of regionData.buy) {
+            if (!providers.find(x => x.name === p.provider_name)) {
+                providers.push({ name: p.provider_name, type: "Buy" });
+            }
+        }
+    }
+
+    return providers;
+}

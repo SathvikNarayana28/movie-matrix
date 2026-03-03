@@ -10,11 +10,27 @@ function AiChat() {
     ]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
+    const [userLocation, setUserLocation] = useState(null);
     const messagesEndRef = useRef(null);
     const inputRef = useRef(null);
     const navigate = useNavigate();
 
     const token = localStorage.getItem("token");
+
+    // Request browser geolocation on mount
+    useEffect(() => {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    setUserLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                    console.log("User location acquired:", pos.coords.latitude, pos.coords.longitude);
+                },
+                (err) => {
+                    console.log("Geolocation denied or unavailable:", err.message);
+                }
+            );
+        }
+    }, []);
 
     // Auto-scroll to bottom on new message
     useEffect(() => {
@@ -35,12 +51,24 @@ function AiChat() {
         if (!trimmed || loading) return;
 
         // Add user message
-        setMessages(prev => [...prev, { role: "user", text: trimmed }]);
+        const updatedMessages = [...messages, { role: "user", text: trimmed }];
+        setMessages(updatedMessages);
         setInput("");
         setLoading(true);
 
         try {
-            const res = await API.post("/ai/chat", { message: trimmed });
+            // Send conversation history for context continuity
+            const history = updatedMessages
+                .filter(m => m.role === "user" || m.role === "bot")
+                .slice(-10) // last 10 messages for context
+                .map(m => ({ role: m.role === "user" ? "user" : "model", text: m.text }));
+
+            const payload = { message: trimmed, history };
+            if (userLocation) {
+                payload.userLat = userLocation.lat;
+                payload.userLng = userLocation.lng;
+            }
+            const res = await API.post("/ai/chat", payload);
             const data = res.data;
 
             setMessages(prev => [
@@ -68,6 +96,10 @@ function AiChat() {
     };
 
     const handleBookClick = (rec) => {
+        if (rec.isOTT) {
+            // OTT movies — no navigation, just informational
+            return;
+        }
         if (rec.showtimeId) {
             navigate(`/book/${rec.showtimeId}`);
         } else if (rec.movieId) {
@@ -80,96 +112,104 @@ function AiChat() {
     if (!token) return null;
 
     return (
-        <>
-            {/* Floating Action Button */}
-            <button className="ai-chat-fab" onClick={() => setIsOpen(!isOpen)} title="AI Movie Assistant">
+        <div className="ai-chat-container">
+            {/* Floating Action Button — always visible */}
+            <button
+                className="ai-chat-fab"
+                onClick={() => setIsOpen(prev => !prev)}
+                title="AI Movie Assistant"
+            >
                 {isOpen ? "✕" : "🤖"}
             </button>
 
-            {/* Chat Window */}
-            {isOpen && (
-                <div className="ai-chat-window">
-                    <div className="ai-chat-header">
-                        <div>
-                            🤖 Movie Matrix AI
-                            <br />
-                            <span>Powered by Gemini</span>
-                        </div>
-                        <button className="ai-chat-close" onClick={() => setIsOpen(false)}>✕</button>
+            {/* Chat Window — always in DOM, toggled via CSS class */}
+            <div className={`ai-chat-window ${isOpen ? "open" : ""}`}>
+                <div className="ai-chat-header">
+                    <div>
+                        🤖 Movie Matrix AI
                     </div>
-
-                    <div className="ai-chat-messages">
-                        {messages.map((msg, i) => (
-                            <div key={i}>
-                                <div className={`ai-msg ${msg.role}`}>
-                                    {msg.text}
-                                </div>
-                                {/* Recommendation cards */}
-                                {msg.recommendations && msg.recommendations.length > 0 && (
-                                    <div className="ai-rec-cards">
-                                        {msg.recommendations.map((rec, j) => (
-                                            <div
-                                                key={j}
-                                                className="ai-rec-card"
-                                                onClick={() => handleBookClick(rec)}
-                                            >
-                                                {rec.posterUrl && (
-                                                    <img
-                                                        src={rec.posterUrl}
-                                                        alt={rec.title}
-                                                        className="ai-rec-poster"
-                                                        onError={(e) => { e.target.style.display = "none"; }}
-                                                    />
-                                                )}
-                                                <div className="ai-rec-info">
-                                                    <span className="ai-rec-title">{rec.title}</span>
-                                                    {rec.theater && (
-                                                        <span className="ai-rec-meta">
-                                                            📍 {rec.theater} {rec.time ? `• ${rec.time}` : ""} {rec.date ? `• ${rec.date}` : ""}
-                                                        </span>
-                                                    )}
-                                                    {rec.reason && (
-                                                        <span className="ai-rec-meta">{rec.reason}</span>
-                                                    )}
-                                                    <span className="ai-rec-book">
-                                                        {rec.showtimeId ? "🎟️ Book Now →" : "View Details →"}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                        {loading && (
-                            <div className="ai-typing">
-                                <span></span><span></span><span></span>
-                            </div>
-                        )}
-                        <div ref={messagesEndRef} />
-                    </div>
-
-                    <div className="ai-chat-input-area">
-                        <input
-                            ref={inputRef}
-                            className="ai-chat-input"
-                            placeholder="Try: 'Something thrilling tonight'..."
-                            value={input}
-                            onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={handleKeyDown}
-                            disabled={loading}
-                        />
-                        <button
-                            className="ai-chat-send"
-                            onClick={handleSend}
-                            disabled={loading || !input.trim()}
-                        >
-                            ➤
-                        </button>
-                    </div>
+                    <button className="ai-chat-close" onClick={() => setIsOpen(false)}>✕</button>
                 </div>
-            )}
-        </>
+
+                <div className="ai-chat-messages">
+                    {messages.map((msg, i) => (
+                        <div key={i}>
+                            <div className={`ai-msg ${msg.role}`}>
+                                {msg.text}
+                            </div>
+                            {/* Recommendation cards */}
+                            {msg.recommendations && msg.recommendations.length > 0 && (
+                                <div className="ai-rec-cards">
+                                    {msg.recommendations.map((rec, j) => (
+                                        <div
+                                            key={j}
+                                            className={`ai-rec-card ${rec.isOTT ? "ott-card" : ""}`}
+                                            onClick={() => handleBookClick(rec)}
+                                        >
+                                            {rec.posterUrl && (
+                                                <img
+                                                    src={rec.posterUrl}
+                                                    alt={rec.title}
+                                                    className="ai-rec-poster"
+                                                    onError={(e) => { e.target.style.display = "none"; }}
+                                                />
+                                            )}
+                                            <div className="ai-rec-info">
+                                                <span className="ai-rec-title">
+                                                    {rec.title}
+                                                    {rec.isOTT && <span className="ott-badge">OTT</span>}
+                                                </span>
+                                                {rec.isOTT && rec.ottPlatforms && (
+                                                    <span className="ai-rec-meta ott-platforms">
+                                                        📺 {rec.ottPlatforms}
+                                                    </span>
+                                                )}
+                                                {!rec.isOTT && rec.theater && (
+                                                    <span className="ai-rec-meta">
+                                                        📍 {rec.theater} {rec.time ? `• ${rec.time}` : ""} {rec.date ? `• ${rec.date}` : ""}
+                                                    </span>
+                                                )}
+                                                {rec.reason && (
+                                                    <span className="ai-rec-meta">{rec.reason}</span>
+                                                )}
+                                                <span className="ai-rec-book">
+                                                    {rec.isOTT ? "📺 Stream at Home" : rec.showtimeId ? "🎟️ Book Now →" : "View Details →"}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                    {loading && (
+                        <div className="ai-typing">
+                            <span></span><span></span><span></span>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                <div className="ai-chat-input-area">
+                    <input
+                        ref={inputRef}
+                        className="ai-chat-input"
+                        placeholder="Try: 'Something thrilling tonight'..."
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        disabled={loading}
+                    />
+                    <button
+                        className="ai-chat-send"
+                        onClick={handleSend}
+                        disabled={loading || !input.trim()}
+                    >
+                        ➤
+                    </button>
+                </div>
+            </div>
+        </div>
     );
 }
 

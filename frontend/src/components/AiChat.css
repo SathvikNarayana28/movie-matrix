@@ -22,20 +22,23 @@
     box-shadow: 0 6px 24px rgba(229, 9, 20, 0.6);
 }
 
-/* Chat Window */
+/* Chat Window — hidden by default, shown when .open class is added */
 .ai-chat-window {
     position: fixed;
     bottom: 100px;
     right: 24px;
-    width: 380px;
-    max-height: 520px;
+    width: 480px;
+    max-height: 670px;
     background: #1a1a2e;
     border-radius: 16px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-    display: flex;
+    display: none;
     flex-direction: column;
     z-index: 9998;
     overflow: hidden;
+}
+.ai-chat-window.open {
+    display: flex;
     animation: chatSlideUp 0.3s ease;
 }
 
@@ -75,8 +78,8 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    min-height: 200px;
-    max-height: 320px;
+    min-height: 320px;
+    max-height: 480px;
 }
 
 .ai-msg {
@@ -148,6 +151,36 @@
     margin-top: 2px;
 }
 
+/* OTT movie cards */
+.ai-rec-card.ott-card {
+    background: #1a2a3a;
+    border-left: 3px solid #00b4d8;
+    cursor: default;
+}
+.ai-rec-card.ott-card:hover {
+    background: #1f3347;
+}
+.ott-badge {
+    display: inline-block;
+    background: #00b4d8;
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 6px;
+    vertical-align: middle;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.ott-platforms {
+    color: #00b4d8 !important;
+    font-weight: 600;
+}
+.ai-rec-card.ott-card .ai-rec-book {
+    color: #00b4d8;
+}
+
 /* Input area */
 .ai-chat-input-area {
     display: flex;
@@ -212,6 +245,6 @@
         left: 8px;
         width: auto;
         bottom: 90px;
-        max-height: 70vh;
+        max-height: 75vh;
     }
 }

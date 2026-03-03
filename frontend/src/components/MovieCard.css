@@ -85,3 +85,27 @@
 .card-heart-btn.heart-active {
     background: rgba(255, 220, 220, 0.95);
 }
+
+/* Preview card (TMDB results not in DB) */
+.movie-card.preview-card {
+    opacity: 0.7;
+    cursor: default;
+    display: block;
+}
+.movie-card.preview-card:hover {
+    transform: none;
+}
+.preview-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.75);
+    color: #ff6b6b;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 10px;
+    border-radius: 4px;
+    z-index: 2;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
