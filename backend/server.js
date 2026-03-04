@@ -39,12 +39,12 @@ app.get("/api/protected", authMiddleware, (req, res) => {
 // In production, serve React frontend build
 if (process.env.NODE_ENV === "production") {
     app.use(express.static(path.join(__dirname, "..", "frontend", "build")));
+} else {
+    // Test route (only in development)
+    app.get("/", (req, res) => {
+        res.send("Backend running");
+    });
 }
-
-// Test route (only shows if no frontend build)
-app.get("/", (req, res) => {
-    res.send("Backend running");
-});
 
 // Database connection
 const Movie = require("./models/Movie");
