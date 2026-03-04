@@ -8,11 +8,179 @@ const Movie = require("../models/Movie");
 const Theater = require("../models/Theater");
 const Showtime = require("../models/Showtime");
 const Booking = require("../models/Booking");
+const User = require("../models/User");
 const { generateSeats } = require("../models/Showtime");
 
 // All admin routes require: 1) valid JWT  2) role === "admin"
 router.use(authMiddleware);
 router.use(adminMiddleware);
+
+// =============================================
+//  OVERVIEW — dashboard stats
+// =============================================
+router.get("/overview", async (req, res) => {
+    try {
+        const [totalMovies, nowShowingMovies, totalTheatres, totalShows, totalUsers, totalBookings, revenueResult, recentBookings] = await Promise.all([
+            Movie.countDocuments(),
+            Movie.countDocuments({ nowShowing: true }),
+            Theater.countDocuments(),
+            Showtime.countDocuments(),
+            User.countDocuments(),
+            Booking.countDocuments({ status: "confirmed" }),
+            Booking.aggregate([
+                { $match: { status: "confirmed" } },
+                { $group: { _id: null, total: { $sum: "$totalPrice" } } }
+            ]),
+            Booking.find({ status: "confirmed" })
+                .sort({ createdAt: -1 })
+                .limit(5)
+                .populate({
+                    path: "showtime",
+                    populate: [
+                        { path: "movie", select: "title" },
+                        { path: "theater", select: "name area" }
+                    ]
+                })
+                .populate("user", "name email")
+        ]);
+
+        // Today's bookings
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayBookings = await Booking.countDocuments({
+            status: "confirmed",
+            createdAt: { $gte: todayStart }
+        });
+
+        // Today's revenue
+        const todayRevenueResult = await Booking.aggregate([
+            { $match: { status: "confirmed", createdAt: { $gte: todayStart } } },
+            { $group: { _id: null, total: { $sum: "$totalPrice" } } }
+        ]);
+
+        res.json({
+            totalMovies,
+            nowShowingMovies,
+            totalTheatres,
+            totalShows,
+            totalUsers,
+            totalBookings,
+            totalRevenue: revenueResult.length > 0 ? revenueResult[0].total : 0,
+            todayBookings,
+            todayRevenue: todayRevenueResult.length > 0 ? todayRevenueResult[0].total : 0,
+            recentBookings: recentBookings.map(b => ({
+                _id: b._id,
+                user: b.user?.name || "Unknown",
+                email: b.user?.email || "",
+                movie: b.showtime?.movie?.title || "Unknown",
+                theatre: b.showtime?.theater?.name || "Unknown",
+                seats: b.seats?.length || 0,
+                total: b.totalPrice,
+                date: b.createdAt
+            }))
+        });
+    } catch (err) {
+        console.error("Overview error:", err);
+        res.status(500).json({ msg: "Failed to load overview" });
+    }
+});
+
+// =============================================
+//  USER MANAGEMENT
+// =============================================
+router.get("/users", async (req, res) => {
+    try {
+        const users = await User.find()
+            .select("name email role createdAt")
+            .sort({ createdAt: -1 });
+        
+        // Get booking count per user
+        const userBookings = await Booking.aggregate([
+            { $match: { status: "confirmed" } },
+            { $group: { _id: "$user", count: { $sum: 1 }, spent: { $sum: "$totalPrice" } } }
+        ]);
+        const bookingMap = {};
+        userBookings.forEach(u => { bookingMap[u._id] = { count: u.count, spent: u.spent }; });
+
+        const usersWithStats = users.map(u => ({
+            _id: u._id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            createdAt: u.createdAt,
+            bookings: bookingMap[u._id]?.count || 0,
+            spent: bookingMap[u._id]?.spent || 0
+        }));
+
+        res.json(usersWithStats);
+    } catch (err) {
+        console.error("Users error:", err);
+        res.status(500).json({ msg: "Failed to load users" });
+    }
+});
+
+// TOGGLE USER ROLE
+router.patch("/users/:id/role", async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) return res.status(404).json({ msg: "User not found" });
+        
+        // Don't allow admin to remove their own admin role
+        if (user._id.toString() === req.user.id) {
+            return res.status(400).json({ msg: "Cannot change your own role" });
+        }
+
+        user.role = user.role === "admin" ? "user" : "admin";
+        await user.save();
+        res.json({ msg: `User role changed to ${user.role}`, user });
+    } catch (err) {
+        res.status(500).json({ msg: "Failed to update role" });
+    }
+});
+
+// =============================================
+//  TOGGLE MOVIE nowShowing
+// =============================================
+router.patch("/movies/:id/toggle", async (req, res) => {
+    try {
+        const movie = await Movie.findById(req.params.id);
+        if (!movie) return res.status(404).json({ msg: "Movie not found" });
+        movie.nowShowing = !movie.nowShowing;
+        await movie.save();
+        res.json({ msg: `"${movie.title}" is now ${movie.nowShowing ? "showing" : "hidden"}`, movie });
+    } catch (err) {
+        res.status(500).json({ msg: "Failed to toggle movie" });
+    }
+});
+
+// =============================================
+//  EDIT MOVIE
+// =============================================
+router.put("/movies/:id", async (req, res) => {
+    try {
+        const { title, genre, language, duration, releaseDate, rating, description, posterUrl, trailerUrl, cast, director, nowShowing } = req.body;
+        const movie = await Movie.findById(req.params.id);
+        if (!movie) return res.status(404).json({ msg: "Movie not found" });
+
+        if (title) movie.title = title;
+        if (genre) movie.genre = Array.isArray(genre) ? genre : genre.split(",").map(g => g.trim());
+        if (language) movie.language = language;
+        if (duration) movie.duration = Number(duration);
+        if (releaseDate) movie.releaseDate = releaseDate;
+        if (rating !== undefined) movie.rating = Number(rating);
+        if (description) movie.description = description;
+        if (posterUrl) movie.posterUrl = posterUrl;
+        if (trailerUrl !== undefined) movie.trailerUrl = trailerUrl;
+        if (cast) movie.cast = Array.isArray(cast) ? cast : cast.split(",").map(c => c.trim());
+        if (director) movie.director = director;
+        if (nowShowing !== undefined) movie.nowShowing = nowShowing;
+
+        await movie.save();
+        res.json({ msg: "Movie updated", movie });
+    } catch (err) {
+        res.status(500).json({ msg: "Failed to update movie" });
+    }
+});
 
 // =============================================
 //  TMDB SEARCH — for "Fetch Details" button
