@@ -608,6 +608,16 @@
     color: #1a1a2e;
 }
 
+.review-user-link {
+    text-decoration: none;
+    color: #e94560;
+}
+
+.review-user-link:hover {
+    text-decoration: underline;
+    color: #d63050;
+}
+
 .review-date {
     font-size: 12px;
     color: #999;

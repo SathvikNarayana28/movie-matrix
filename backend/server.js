@@ -14,6 +14,7 @@ const adminRoutes = require("./routes/adminRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const aiRoutes = require("./routes/aiRoutes");
 const reviewRoutes = require("./routes/reviewRoutes");
+const userRoutes = require("./routes/userRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
 
 const app = express();   // <-- app is created HERE
@@ -32,6 +33,7 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/reviews", reviewRoutes);
+app.use("/api/users", userRoutes);
 
 // Protected route (NOW it is after app creation)
 app.get("/api/protected", authMiddleware, (req, res) => {

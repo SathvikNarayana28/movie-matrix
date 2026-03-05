@@ -13,6 +13,8 @@ import MyBookings from "./pages/MyBookings";
 import Favorites from "./pages/Favorites";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
+import ReviewsFeed from "./pages/ReviewsFeed";
+import UserProfile from "./pages/UserProfile";
 
 function App() {
     return (
@@ -25,6 +27,8 @@ function App() {
                 <Route path="/my-bookings" element={<MyBookings />} />
                 <Route path="/favorites" element={<Favorites />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route path="/feed" element={<ReviewsFeed />} />
+                <Route path="/user/:userId" element={<UserProfile />} />
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />

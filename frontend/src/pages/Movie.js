@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import API from "../api";
 import TrailerModal from "../components/TrailerModal";
 import "./Movie.css";
@@ -467,7 +467,9 @@ function Movie() {
                         <div key={rev._id} className="review-card">
                             <div className="review-card-header">
                                 <div className="review-user-info">
-                                    <span className="review-user-name">{rev.user?.name || "User"}</span>
+                                    <Link to={`/user/${rev.user?._id}`} className="review-user-name review-user-link">
+                                        {rev.user?.name || "User"}
+                                    </Link>
                                     <span className="review-date">
                                         {new Date(rev.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
                                     </span>

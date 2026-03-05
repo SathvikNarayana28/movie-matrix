@@ -7,8 +7,12 @@ const {
     getAverageRating,
     checkEligibility,
     updateReview,
-    deleteReview
+    deleteReview,
+    getReviewsFeed
 } = require("../controllers/reviewController");
+
+// Feed route (must be before /:movieId to avoid conflicts)
+router.get("/feed", authMiddleware, getReviewsFeed);
 
 // Public routes
 router.get("/:movieId", getMovieReviews);

@@ -1,6 +1,7 @@
 const Review = require("../models/Review");
 const Booking = require("../models/Booking");
 const Showtime = require("../models/Showtime");
+const User = require("../models/User");
 const mongoose = require("mongoose");
 
 // POST /api/reviews/:movieId — Create a review (with booking + showtime verification)
@@ -198,5 +199,30 @@ exports.deleteReview = async (req, res) => {
     } catch (err) {
         console.error("Delete review error:", err);
         res.status(500).json({ error: "Failed to delete review." });
+    }
+};
+
+// GET /api/reviews/feed — Reviews from users the current user follows (newest first)
+exports.getReviewsFeed = async (req, res) => {
+    try {
+        const currentUser = await User.findById(req.user.id).select("following");
+        if (!currentUser) {
+            return res.status(404).json({ error: "User not found." });
+        }
+
+        if (currentUser.following.length === 0) {
+            return res.json([]);
+        }
+
+        const reviews = await Review.find({ user: { $in: currentUser.following } })
+            .populate("user", "name")
+            .populate("movie", "title posterUrl")
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        res.json(reviews);
+    } catch (err) {
+        console.error("Reviews feed error:", err);
+        res.status(500).json({ error: "Failed to fetch reviews feed." });
     }
 };

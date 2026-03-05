@@ -1,0 +1,138 @@
+.feed-page {
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+.feed-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 4px;
+}
+
+.feed-subtitle {
+    font-size: 14px;
+    color: #888;
+    margin: 0 0 24px;
+}
+
+.feed-loading,
+.feed-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: #777;
+}
+
+.feed-error {
+    color: #e94560;
+}
+
+.feed-empty {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f9f9f9;
+    border-radius: 10px;
+    color: #777;
+}
+
+.feed-empty p {
+    margin: 0 0 6px;
+}
+
+.feed-empty-hint {
+    font-size: 13px;
+    color: #aaa;
+}
+
+/* Feed List */
+.feed-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.feed-card {
+    display: flex;
+    gap: 16px;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 16px;
+    transition: box-shadow 0.2s;
+}
+
+.feed-card:hover {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.feed-poster {
+    width: 60px;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 6px;
+    flex-shrink: 0;
+}
+
+.feed-card-right {
+    flex: 1;
+    min-width: 0;
+}
+
+.feed-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.feed-reviewer-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #e94560;
+    text-decoration: none;
+}
+
+.feed-reviewer-name:hover {
+    text-decoration: underline;
+    color: #d63050;
+}
+
+.feed-date {
+    font-size: 12px;
+    color: #999;
+}
+
+.feed-movie-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a2e;
+    margin: 0 0 6px;
+}
+
+.feed-stars {
+    margin-bottom: 6px;
+}
+
+.feed-comment {
+    font-size: 14px;
+    color: #444;
+    line-height: 1.5;
+    margin: 0;
+}
+
+@media (max-width: 600px) {
+    .feed-card {
+        flex-direction: column;
+        gap: 10px;
+    }
+    .feed-poster {
+        width: 100%;
+        height: 120px;
+    }
+    .feed-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+}

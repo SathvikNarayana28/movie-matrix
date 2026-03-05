@@ -13,6 +13,14 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "Movie"                                    // list of saved movie IDs
     }],
+    followers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"                                     // users who follow this user
+    }],
+    following: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "User"                                     // users this user follows
+    }],
     resetPasswordToken: { type: String, default: null },     // hashed crypto token
     resetPasswordExpires: { type: Date, default: null }      // token expiry time
 }, { timestamps: true });
