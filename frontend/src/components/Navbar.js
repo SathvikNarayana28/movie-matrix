@@ -45,6 +45,8 @@ function Navbar() {
                 {token && <Link to="/my-bookings">My Bookings</Link>}
                 {token && <Link to="/favorites">Favorites</Link>}
                 {token && <Link to="/feed">Reviews Feed</Link>}
+                {token && <Link to="/search-users">Search Users</Link>}
+                <Link to="/top-reviewers">Top Reviewers</Link>
                 {token && <Link to="/profile">Profile</Link>}
                 {token ? (
                     <button onClick={handleLogout} className="logout-btn">Logout</button>

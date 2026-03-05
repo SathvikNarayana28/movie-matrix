@@ -1,6 +1,43 @@
 const User = require("../models/User");
 const Review = require("../models/Review");
 
+// GET /api/users/search?query=<name> — Search users by name
+exports.searchUsers = async (req, res) => {
+    try {
+        const { query } = req.query;
+        if (!query || query.trim().length === 0) {
+            return res.json([]);
+        }
+
+        const currentUserId = req.user.id;
+
+        // Find users whose name matches the query (case-insensitive), exclude current user
+        const users = await User.find({
+            name: { $regex: query.trim(), $options: "i" },
+            _id: { $ne: currentUserId }
+        })
+            .select("name followers following")
+            .limit(10);
+
+        // For each user, tell the frontend if the current user is already following them
+        const currentUser = await User.findById(currentUserId).select("following");
+        const followingIds = currentUser.following.map(id => id.toString());
+
+        const results = users.map(user => ({
+            _id: user._id,
+            name: user.name,
+            followersCount: user.followers.length,
+            followingCount: user.following.length,
+            isFollowing: followingIds.includes(user._id.toString())
+        }));
+
+        res.json(results);
+    } catch (err) {
+        console.error("Search users error:", err);
+        res.status(500).json({ error: "Failed to search users." });
+    }
+};
+
 // POST /api/users/follow/:userId — Follow a user
 exports.followUser = async (req, res) => {
     try {

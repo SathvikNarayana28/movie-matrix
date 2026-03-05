@@ -15,6 +15,8 @@ import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
 import ReviewsFeed from "./pages/ReviewsFeed";
 import UserProfile from "./pages/UserProfile";
+import SearchUsers from "./pages/SearchUsers";
+import TopReviewers from "./pages/TopReviewers";
 
 function App() {
     return (
@@ -28,7 +30,10 @@ function App() {
                 <Route path="/favorites" element={<Favorites />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/feed" element={<ReviewsFeed />} />
+                <Route path="/search-users" element={<SearchUsers />} />
+                <Route path="/top-reviewers" element={<TopReviewers />} />
                 <Route path="/user/:userId" element={<UserProfile />} />
+                <Route path="/profile/:userId" element={<UserProfile />} />
                 <Route path="/admin" element={<AdminDashboard />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />

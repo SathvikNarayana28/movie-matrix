@@ -86,6 +86,13 @@
     margin-bottom: 4px;
 }
 
+.feed-header-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
 .feed-reviewer-name {
     font-size: 15px;
     font-weight: 600;
@@ -96,6 +103,16 @@
 .feed-reviewer-name:hover {
     text-decoration: underline;
     color: #d63050;
+}
+
+.feed-verified-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: #0d9488;
+    background: #e6faf8;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
 }
 
 .feed-date {
@@ -118,7 +135,45 @@
     font-size: 14px;
     color: #444;
     line-height: 1.5;
-    margin: 0;
+    margin: 0 0 8px;
+}
+
+/* Like button */
+.feed-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.feed-like-btn {
+    background: none;
+    border: 1px solid #eee;
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+    font-family: inherit;
+    color: #666;
+}
+
+.feed-like-btn:hover {
+    border-color: #e94560;
+    background: #fff5f7;
+}
+
+.feed-like-btn.feed-liked {
+    border-color: #e94560;
+    background: #fff0f3;
+    color: #e94560;
+}
+
+.feed-like-count {
+    font-size: 13px;
+    font-weight: 600;
 }
 
 @media (max-width: 600px) {

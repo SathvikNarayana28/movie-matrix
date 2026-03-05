@@ -103,14 +103,33 @@ exports.checkEligibility = async (req, res) => {
     }
 };
 
-// GET /api/reviews/:movieId — Get all reviews for a movie
+// GET /api/reviews/:movieId — Get all reviews for a movie (with verifiedViewer check)
 exports.getMovieReviews = async (req, res) => {
     try {
-        const reviews = await Review.find({ movie: req.params.movieId })
+        const movieId = req.params.movieId;
+        const reviews = await Review.find({ movie: movieId })
             .populate("user", "name")
             .sort({ createdAt: -1 });
 
-        res.json(reviews);
+        // Find all showtimes for this movie to check bookings
+        const movieShowtimeIds = await Showtime.find({ movie: movieId }).select("_id");
+        const showtimeIds = movieShowtimeIds.map(st => st._id);
+
+        // Check which reviewers have confirmed bookings
+        const bookings = await Booking.find({
+            showtime: { $in: showtimeIds },
+            status: "confirmed"
+        }).select("user");
+        const bookedUserIds = bookings.map(b => b.user.toString());
+
+        // Add verifiedViewer flag to each review
+        const reviewsWithBadge = reviews.map(rev => {
+            const revObj = rev.toObject();
+            revObj.verifiedViewer = bookedUserIds.includes(rev.user._id.toString());
+            return revObj;
+        });
+
+        res.json(reviewsWithBadge);
     } catch (err) {
         console.error("Get reviews error:", err);
         res.status(500).json({ error: "Failed to fetch reviews." });
@@ -202,7 +221,7 @@ exports.deleteReview = async (req, res) => {
     }
 };
 
-// GET /api/reviews/feed — Reviews from users the current user follows (newest first)
+// GET /api/reviews/feed — Reviews from the current user + users they follow (newest first)
 exports.getReviewsFeed = async (req, res) => {
     try {
         const currentUser = await User.findById(req.user.id).select("following");
@@ -210,19 +229,98 @@ exports.getReviewsFeed = async (req, res) => {
             return res.status(404).json({ error: "User not found." });
         }
 
-        if (currentUser.following.length === 0) {
-            return res.json([]);
-        }
+        // Include both the current user's own reviews AND reviews from followed users
+        const feedUserIds = [req.user.id, ...currentUser.following];
 
-        const reviews = await Review.find({ user: { $in: currentUser.following } })
+        const reviews = await Review.find({ user: { $in: feedUserIds } })
             .populate("user", "name")
             .populate("movie", "title posterUrl")
             .sort({ createdAt: -1 })
             .limit(50);
 
-        res.json(reviews);
+        // Dynamically compute verifiedViewer for each review by checking bookings
+        const reviewsWithBadge = await Promise.all(reviews.map(async (rev) => {
+            const revObj = rev.toObject();
+            if (rev.movie) {
+                const showtimeIds = await Showtime.find({ movie: rev.movie._id }).select("_id");
+                const sIds = showtimeIds.map(s => s._id);
+                const booking = await Booking.findOne({
+                    user: rev.user._id,
+                    showtime: { $in: sIds },
+                    status: "confirmed"
+                });
+                revObj.verifiedViewer = !!booking;
+            } else {
+                revObj.verifiedViewer = false;
+            }
+            return revObj;
+        }));
+
+        res.json(reviewsWithBadge);
     } catch (err) {
         console.error("Reviews feed error:", err);
         res.status(500).json({ error: "Failed to fetch reviews feed." });
+    }
+};
+
+// GET /api/reviews/top-reviewers — Leaderboard of users with most reviews
+exports.getTopReviewers = async (req, res) => {
+    try {
+        const topReviewers = await Review.aggregate([
+            {
+                $group: {
+                    _id: "$user",
+                    reviewCount: { $sum: 1 },
+                    avgRating: { $avg: "$rating" }
+                }
+            },
+            { $sort: { reviewCount: -1 } },
+            { $limit: 10 }
+        ]);
+
+        // Populate user names
+        const populatedReviewers = await User.populate(topReviewers, {
+            path: "_id",
+            select: "name"
+        });
+
+        const results = populatedReviewers.map(r => ({
+            userId: r._id._id,
+            name: r._id.name,
+            reviewCount: r.reviewCount,
+            avgRating: Math.round(r.avgRating * 10) / 10
+        }));
+
+        res.json(results);
+    } catch (err) {
+        console.error("Top reviewers error:", err);
+        res.status(500).json({ error: "Failed to fetch top reviewers." });
+    }
+};
+
+// POST /api/reviews/:reviewId/like — Like or unlike a review (toggle)
+exports.toggleLikeReview = async (req, res) => {
+    try {
+        const review = await Review.findById(req.params.reviewId);
+        if (!review) {
+            return res.status(404).json({ error: "Review not found." });
+        }
+
+        const userId = req.user.id;
+        const alreadyLiked = review.likes.some(id => id.toString() === userId);
+
+        if (alreadyLiked) {
+            // Unlike
+            review.likes = review.likes.filter(id => id.toString() !== userId);
+        } else {
+            // Like
+            review.likes.push(userId);
+        }
+
+        await review.save();
+        res.json({ liked: !alreadyLiked, likesCount: review.likes.length });
+    } catch (err) {
+        console.error("Toggle like error:", err);
+        res.status(500).json({ error: "Failed to toggle like." });
     }
 };

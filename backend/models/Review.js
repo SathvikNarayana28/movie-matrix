@@ -5,6 +5,8 @@ const ReviewSchema = new mongoose.Schema({
     movie: { type: mongoose.Schema.Types.ObjectId, ref: "Movie", required: true },
     rating: { type: Number, required: true, min: 1, max: 5 },        // 1–5 stars
     comment: { type: String, required: true, maxlength: 1000 },
+    isVerifiedViewer: { type: Boolean, default: true },               // true = user had a confirmed booking
+    likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],   // users who liked this review
     createdAt: { type: Date, default: Date.now }
 });
 

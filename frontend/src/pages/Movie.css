@@ -636,12 +636,53 @@
 }
 
 /* Edit / Delete buttons */
-.review-actions {
+.review-actions,
+.review-bottom-actions {
     display: flex;
     gap: 10px;
     margin-top: 12px;
     padding-top: 10px;
     border-top: 1px solid #f0f0f0;
+    align-items: center;
+}
+
+/* Verified Viewer badge on movie page */
+.review-verified-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: #0d9488;
+    background: #e6faf8;
+    padding: 2px 8px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+/* Like button on movie page */
+.review-like-btn {
+    background: none;
+    border: 1px solid #eee;
+    border-radius: 20px;
+    padding: 4px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s;
+    font-family: inherit;
+    color: #666;
+}
+
+.review-like-btn:hover {
+    border-color: #e94560;
+    background: #fff5f7;
+}
+
+.review-like-btn.review-liked {
+    border-color: #e94560;
+    background: #fff0f3;
+    color: #e94560;
+    font-weight: 600;
 }
 
 .review-edit-btn,

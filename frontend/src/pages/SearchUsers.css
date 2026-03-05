@@ -1,0 +1,194 @@
+.search-users-page {
+    max-width: 650px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+.search-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 4px;
+}
+
+.search-subtitle {
+    font-size: 14px;
+    color: #888;
+    margin: 0 0 24px;
+}
+
+/* Search Bar */
+.search-bar-container {
+    position: relative;
+    margin-bottom: 24px;
+}
+
+.search-input {
+    width: 100%;
+    padding: 12px 16px;
+    font-size: 15px;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    outline: none;
+    font-family: inherit;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.search-input:focus {
+    border-color: #e94560;
+}
+
+.search-spinner {
+    position: absolute;
+    right: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 13px;
+    color: #999;
+}
+
+/* Empty / No Results */
+.search-no-results {
+    text-align: center;
+    color: #999;
+    padding: 20px 0;
+}
+
+.search-empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f9f9f9;
+    border-radius: 10px;
+    color: #777;
+    font-size: 15px;
+}
+
+/* Result Cards */
+.search-results {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.search-result-card {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 16px;
+    transition: box-shadow 0.2s;
+}
+
+.search-result-card:hover {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.search-result-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.search-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: #1a1a2e;
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.search-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.search-user-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-decoration: none;
+}
+
+.search-user-name:hover {
+    color: #e94560;
+}
+
+.search-user-stats {
+    font-size: 13px;
+    color: #888;
+}
+
+/* Action Buttons */
+.search-result-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.search-follow-btn {
+    padding: 8px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+    background: #e94560;
+    color: #fff;
+}
+
+.search-follow-btn:hover {
+    background: #d63050;
+}
+
+.search-follow-btn.search-following {
+    background: #eee;
+    color: #555;
+}
+
+.search-follow-btn.search-following:hover {
+    background: #ddd;
+    color: #333;
+}
+
+.search-profile-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #555;
+    background: #fff;
+    transition: all 0.2s;
+}
+
+.search-profile-btn:hover {
+    border-color: #e94560;
+    color: #e94560;
+}
+
+@media (max-width: 600px) {
+    .search-result-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .search-result-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+}

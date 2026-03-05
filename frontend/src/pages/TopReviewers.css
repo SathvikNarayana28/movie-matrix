@@ -1,0 +1,154 @@
+.top-reviewers-page {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+.tr-title {
+    font-size: 24px;
+    font-weight: 700;
+    color: #1a1a2e;
+    margin: 0 0 4px;
+}
+
+.tr-subtitle {
+    font-size: 14px;
+    color: #888;
+    margin: 0 0 24px;
+}
+
+.tr-loading,
+.tr-error {
+    text-align: center;
+    padding: 40px 20px;
+    color: #777;
+}
+
+.tr-error {
+    color: #e94560;
+}
+
+.tr-empty {
+    text-align: center;
+    padding: 40px 20px;
+    background: #f9f9f9;
+    border-radius: 10px;
+    color: #777;
+}
+
+/* Leaderboard List */
+.tr-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tr-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #fff;
+    border: 1px solid #eee;
+    border-radius: 10px;
+    padding: 16px;
+    transition: box-shadow 0.2s;
+}
+
+.tr-card:hover {
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+/* Top 3 get special border */
+.tr-card:nth-child(1) {
+    border-left: 4px solid #ffd700;
+}
+
+.tr-card:nth-child(2) {
+    border-left: 4px solid #c0c0c0;
+}
+
+.tr-card:nth-child(3) {
+    border-left: 4px solid #cd7f32;
+}
+
+.tr-rank {
+    font-size: 22px;
+    font-weight: 700;
+    min-width: 36px;
+    text-align: center;
+    color: #1a1a2e;
+}
+
+.tr-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background-color: #1a1a2e;
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.tr-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.tr-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #1a1a2e;
+    text-decoration: none;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.tr-name:hover {
+    color: #e94560;
+}
+
+.tr-stats {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.tr-review-count {
+    font-size: 13px;
+    font-weight: 600;
+    color: #e94560;
+}
+
+.tr-separator {
+    color: #ccc;
+    font-size: 13px;
+}
+
+.tr-avg-rating {
+    font-size: 13px;
+    color: #666;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+@media (max-width: 600px) {
+    .tr-card {
+        padding: 12px;
+        gap: 10px;
+    }
+    .tr-rank {
+        font-size: 18px;
+        min-width: 28px;
+    }
+    .tr-avatar {
+        width: 36px;
+        height: 36px;
+        font-size: 16px;
+    }
+}

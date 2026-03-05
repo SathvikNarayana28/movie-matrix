@@ -30,6 +30,7 @@ function Movie() {
     const [editingReview, setEditingReview] = useState(null);
     const [userReview, setUserReview] = useState(null);
     const [hasBooked, setHasBooked] = useState(false);
+    const [currentUserId, setCurrentUserId] = useState(null);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -76,6 +77,7 @@ function Movie() {
                         API.get("/auth/me")
                     ]);
                     setHasBooked(eligRes.data.hasBooked);
+                    setCurrentUserId(meRes.data._id);
                     const myReview = revRes.data.find(r => r.user._id === meRes.data._id);
                     setUserReview(myReview || null);
                 } catch (e) { /* not logged in */ }
@@ -174,6 +176,28 @@ function Movie() {
             fetchReviews();
         } catch (err) {
             setReviewError(err.response?.data?.error || "Failed to delete review.");
+        }
+    };
+
+    const handleLikeReview = async (reviewId) => {
+        const token = localStorage.getItem("token");
+        if (!token) { navigate("/login"); return; }
+        try {
+            const res = await API.post(`/reviews/${reviewId}/like`);
+            // Update like state locally
+            setReviews(prev => prev.map(rev => {
+                if (rev._id === reviewId) {
+                    return {
+                        ...rev,
+                        likes: res.data.liked
+                            ? [...(rev.likes || []), currentUserId]
+                            : (rev.likes || []).filter(lid => lid !== currentUserId),
+                    };
+                }
+                return rev;
+            }));
+        } catch (err) {
+            console.error("Like error:", err);
         }
     };
 
@@ -463,29 +487,50 @@ function Movie() {
                     {reviews.length === 0 && (
                         <p className="no-reviews">No reviews yet. Be the first to review!</p>
                     )}
-                    {reviews.map(rev => (
-                        <div key={rev._id} className="review-card">
-                            <div className="review-card-header">
-                                <div className="review-user-info">
-                                    <Link to={`/user/${rev.user?._id}`} className="review-user-name review-user-link">
-                                        {rev.user?.name || "User"}
-                                    </Link>
-                                    <span className="review-date">
-                                        {new Date(rev.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
-                                    </span>
+                    {reviews.map(rev => {
+                        const isLiked = currentUserId && (rev.likes || []).some(
+                            lid => (typeof lid === "string" ? lid : lid?._id || lid) === currentUserId
+                        );
+                        const likesCount = (rev.likes || []).length;
+
+                        return (
+                            <div key={rev._id} className="review-card">
+                                <div className="review-card-header">
+                                    <div className="review-user-info">
+                                        <Link to={`/profile/${rev.user?._id}`} className="review-user-name review-user-link">
+                                            {rev.user?.name || "User"}
+                                        </Link>
+                                        {rev.verifiedViewer && (
+                                            <span className="review-verified-badge" title="Verified Viewer — booked and watched this movie">
+                                                ✓ Verified Viewer
+                                            </span>
+                                        )}
+                                        <span className="review-date">
+                                            {new Date(rev.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                        </span>
+                                    </div>
+                                    <div className="review-stars">{renderStars(rev.rating, 16)}</div>
                                 </div>
-                                <div className="review-stars">{renderStars(rev.rating, 16)}</div>
+                                <p className="review-comment">{rev.comment}</p>
+                                <div className="review-bottom-actions">
+                                    <button
+                                        className={`review-like-btn ${isLiked ? "review-liked" : ""}`}
+                                        onClick={() => handleLikeReview(rev._id)}
+                                        title={isLiked ? "Unlike" : "Like"}
+                                    >
+                                        {isLiked ? "👍" : "👍"} {likesCount > 0 ? `${likesCount} like${likesCount !== 1 ? "s" : ""}` : "Like"}
+                                    </button>
+                                    {/* Show edit/delete only for the user's own review */}
+                                    {userReview && userReview._id === rev._id && (
+                                        <>
+                                            <button className="review-edit-btn" onClick={() => handleEditReview(rev)}>Edit</button>
+                                            <button className="review-delete-btn" onClick={() => handleDeleteReview(rev._id)}>Delete</button>
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                            <p className="review-comment">{rev.comment}</p>
-                            {/* Show edit/delete only for the user's own review */}
-                            {userReview && userReview._id === rev._id && (
-                                <div className="review-actions">
-                                    <button className="review-edit-btn" onClick={() => handleEditReview(rev)}>Edit</button>
-                                    <button className="review-delete-btn" onClick={() => handleDeleteReview(rev._id)}>Delete</button>
-                                </div>
-                            )}
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
 
