@@ -18,6 +18,19 @@ function Movie() {
     const [trailerLoading, setTrailerLoading] = useState(false);
     const [trailerError, setTrailerError] = useState("");
 
+    // Review state
+    const [reviews, setReviews] = useState([]);
+    const [avgRating, setAvgRating] = useState(0);
+    const [totalReviews, setTotalReviews] = useState(0);
+    const [reviewRating, setReviewRating] = useState(0);
+    const [hoverRating, setHoverRating] = useState(0);
+    const [reviewComment, setReviewComment] = useState("");
+    const [reviewError, setReviewError] = useState("");
+    const [reviewSuccess, setReviewSuccess] = useState("");
+    const [editingReview, setEditingReview] = useState(null);
+    const [userReview, setUserReview] = useState(null);
+    const [hasBooked, setHasBooked] = useState(false);
+
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -43,6 +56,40 @@ function Movie() {
         fetchData();
     }, [id]);
 
+    // Fetch reviews, average rating, and eligibility
+    const fetchReviews = async () => {
+        try {
+            const [revRes, avgRes] = await Promise.all([
+                API.get(`/reviews/${id}`),
+                API.get(`/reviews/${id}/average`)
+            ]);
+            setReviews(revRes.data);
+            setAvgRating(avgRes.data.averageRating);
+            setTotalReviews(avgRes.data.totalReviews);
+
+            // Check eligibility and find user's own review
+            const token = localStorage.getItem("token");
+            if (token) {
+                try {
+                    const [eligRes, meRes] = await Promise.all([
+                        API.get(`/reviews/${id}/eligibility`),
+                        API.get("/auth/me")
+                    ]);
+                    setHasBooked(eligRes.data.hasBooked);
+                    const myReview = revRes.data.find(r => r.user._id === meRes.data._id);
+                    setUserReview(myReview || null);
+                } catch (e) { /* not logged in */ }
+            }
+        } catch (err) {
+            console.error("Error fetching reviews:", err);
+        }
+    };
+
+    useEffect(() => {
+        fetchReviews();
+        // eslint-disable-next-line
+    }, [id]);
+
     const handleToggleFavorite = async () => {
         const token = localStorage.getItem("token");
         if (!token) {
@@ -65,6 +112,77 @@ function Movie() {
             return;
         }
         navigate(`/book/${showtimeId}`);
+    };
+
+    // ---- Review Handlers ----
+    const handleSubmitReview = async (e) => {
+        e.preventDefault();
+        setReviewError("");
+        setReviewSuccess("");
+
+        const token = localStorage.getItem("token");
+        if (!token) { navigate("/login"); return; }
+
+        if (reviewRating < 1 || reviewRating > 5) {
+            setReviewError("Please select a rating (1–5 stars).");
+            return;
+        }
+        if (!reviewComment.trim()) {
+            setReviewError("Please write a comment.");
+            return;
+        }
+
+        try {
+            if (editingReview) {
+                await API.put(`/reviews/${editingReview._id}`, { rating: reviewRating, comment: reviewComment });
+                setReviewSuccess("Review updated!");
+                setEditingReview(null);
+            } else {
+                await API.post(`/reviews/${id}`, { rating: reviewRating, comment: reviewComment });
+                setReviewSuccess("Review submitted!");
+            }
+            setReviewRating(0);
+            setReviewComment("");
+            fetchReviews();
+        } catch (err) {
+            setReviewError(err.response?.data?.error || "Failed to submit review.");
+        }
+    };
+
+    const handleEditReview = (review) => {
+        setEditingReview(review);
+        setReviewRating(review.rating);
+        setReviewComment(review.comment);
+        setReviewError("");
+        setReviewSuccess("");
+    };
+
+    const handleCancelEdit = () => {
+        setEditingReview(null);
+        setReviewRating(0);
+        setReviewComment("");
+        setReviewError("");
+        setReviewSuccess("");
+    };
+
+    const handleDeleteReview = async (reviewId) => {
+        if (!window.confirm("Delete your review?")) return;
+        try {
+            await API.delete(`/reviews/${reviewId}`);
+            setReviewSuccess("Review deleted.");
+            setUserReview(null);
+            fetchReviews();
+        } catch (err) {
+            setReviewError(err.response?.data?.error || "Failed to delete review.");
+        }
+    };
+
+    const renderStars = (count, size = 18) => {
+        return [...Array(5)].map((_, i) => (
+            <span key={i} style={{ color: i < count ? "#f5c518" : "#ccc", fontSize: size }}>
+                ★
+            </span>
+        ));
     };
 
     const handleWatchTrailer = async () => {
@@ -267,6 +385,107 @@ function Movie() {
                     ))}
                 </div>
             )}
+
+            {/* ========== Reviews Section ========== */}
+            <div className="reviews-section">
+                <h3 className="reviews-heading">User Reviews</h3>
+
+                {/* Average Rating Summary */}
+                <div className="review-summary">
+                    <div className="review-avg-stars">
+                        {renderStars(Math.round(avgRating), 24)}
+                    </div>
+                    <span className="review-avg-number">{avgRating > 0 ? avgRating : "—"}</span>
+                    <span className="review-avg-count">
+                        {totalReviews === 0 ? "No reviews yet" : `${totalReviews} review${totalReviews > 1 ? "s" : ""}`}
+                    </span>
+                </div>
+
+                {/* Review Form — show if logged in AND booked AND (no existing review OR editing) */}
+                {localStorage.getItem("token") && hasBooked && (!userReview || editingReview) && (
+                    <form className="review-form" onSubmit={handleSubmitReview}>
+                        <h4>{editingReview ? "Edit Your Review" : "Write a Review"}</h4>
+                        <div className="star-picker">
+                            {[1, 2, 3, 4, 5].map(star => (
+                                <span
+                                    key={star}
+                                    className={`star-pick ${star <= (hoverRating || reviewRating) ? "star-active" : ""}`}
+                                    onClick={() => setReviewRating(star)}
+                                    onMouseEnter={() => setHoverRating(star)}
+                                    onMouseLeave={() => setHoverRating(0)}
+                                >
+                                    ★
+                                </span>
+                            ))}
+                            <span className="star-label">
+                                {reviewRating > 0 ? `${reviewRating}/5` : "Select rating"}
+                            </span>
+                        </div>
+                        <textarea
+                            className="review-textarea"
+                            placeholder="Share your thoughts about this movie..."
+                            value={reviewComment}
+                            onChange={e => setReviewComment(e.target.value)}
+                            maxLength={1000}
+                            rows={4}
+                        />
+                        <div className="review-form-actions">
+                            <button type="submit" className="review-submit-btn">
+                                {editingReview ? "Update Review" : "Submit Review"}
+                            </button>
+                            {editingReview && (
+                                <button type="button" className="review-cancel-btn" onClick={handleCancelEdit}>
+                                    Cancel
+                                </button>
+                            )}
+                        </div>
+                        {reviewError && <p className="review-error">{reviewError}</p>}
+                        {reviewSuccess && <p className="review-success">{reviewSuccess}</p>}
+                    </form>
+                )}
+
+                {/* Not logged in prompt */}
+                {!localStorage.getItem("token") && (
+                    <p className="review-login-prompt">
+                        <span onClick={() => navigate("/login")} className="review-login-link">Log in</span> to write a review.
+                    </p>
+                )}
+
+                {/* Logged in but hasn't booked this movie */}
+                {localStorage.getItem("token") && !hasBooked && (
+                    <p className="review-booking-prompt">
+                        Only users who have booked this movie can leave a review.
+                    </p>
+                )}
+
+                {/* Reviews List */}
+                <div className="reviews-list">
+                    {reviews.length === 0 && (
+                        <p className="no-reviews">No reviews yet. Be the first to review!</p>
+                    )}
+                    {reviews.map(rev => (
+                        <div key={rev._id} className="review-card">
+                            <div className="review-card-header">
+                                <div className="review-user-info">
+                                    <span className="review-user-name">{rev.user?.name || "User"}</span>
+                                    <span className="review-date">
+                                        {new Date(rev.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+                                    </span>
+                                </div>
+                                <div className="review-stars">{renderStars(rev.rating, 16)}</div>
+                            </div>
+                            <p className="review-comment">{rev.comment}</p>
+                            {/* Show edit/delete only for the user's own review */}
+                            {userReview && userReview._id === rev._id && (
+                                <div className="review-actions">
+                                    <button className="review-edit-btn" onClick={() => handleEditReview(rev)}>Edit</button>
+                                    <button className="review-delete-btn" onClick={() => handleDeleteReview(rev._id)}>Delete</button>
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            </div>
 
             {/* Trailer Modal */}
             {showTrailer && trailerKey && (

@@ -12,7 +12,9 @@ const UserSchema = new mongoose.Schema({
     favorites: [{
         type: mongoose.Schema.Types.ObjectId,
         ref: "Movie"                                    // list of saved movie IDs
-    }]
+    }],
+    resetPasswordToken: { type: String, default: null },     // hashed crypto token
+    resetPasswordExpires: { type: Date, default: null }      // token expiry time
 }, { timestamps: true });
 
 module.exports = mongoose.model("User", UserSchema);

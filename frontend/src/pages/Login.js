@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import API from "../api";
 import "./Login.css";
 
@@ -7,7 +7,6 @@ function Login() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
-    const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -19,12 +18,13 @@ function Login() {
             localStorage.setItem("role", res.data.user?.role || "user");
             localStorage.setItem("userId", res.data.user?.id || "");
             const userRole = res.data.user?.role || "user";
+            // Use window.location to navigate + reload in one step
+            // so the navbar refreshes AND we land on the correct page
             if (userRole === "admin") {
-                navigate("/admin");
+                window.location.href = "/admin";
             } else {
-                navigate("/");
+                window.location.href = "/";
             }
-            window.location.reload();   // refresh navbar to show Logout
         } catch (err) {
             setError(err.response?.data?.msg || "Login failed. Try again.");
         }
@@ -57,6 +57,9 @@ function Login() {
 
                 <button type="submit">Login</button>
 
+                <p className="auth-switch">
+                    <Link to="/forgot-password">Forgot Password?</Link>
+                </p>
                 <p className="auth-switch">
                     Don't have an account? <Link to="/register">Register</Link>
                 </p>

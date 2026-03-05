@@ -13,6 +13,7 @@ const favoriteRoutes = require("./routes/favoriteRoutes");
 const adminRoutes = require("./routes/adminRoutes");
 const paymentRoutes = require("./routes/paymentRoutes");
 const aiRoutes = require("./routes/aiRoutes");
+const reviewRoutes = require("./routes/reviewRoutes");
 const authMiddleware = require("./middleware/authMiddleware");
 
 const app = express();   // <-- app is created HERE
@@ -30,6 +31,7 @@ app.use("/api/favorites", favoriteRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/reviews", reviewRoutes);
 
 // Protected route (NOW it is after app creation)
 app.get("/api/protected", authMiddleware, (req, res) => {
