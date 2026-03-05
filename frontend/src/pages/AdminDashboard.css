@@ -530,6 +530,60 @@
     color: #1a1a2e;
 }
 
+.show-subsection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.show-subsection-header h3,
+.show-subsection-header h4 {
+    margin: 0;
+}
+
+/* ---- Multi-show entries ---- */
+.multi-show-entry {
+    background: #f8f9fc;
+    border: 1px solid #e2e6ef;
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    position: relative;
+    transition: box-shadow 0.15s;
+}
+
+.multi-show-entry:hover {
+    box-shadow: 0 2px 8px rgba(26, 26, 46, 0.06);
+}
+
+.multi-show-entry-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.show-entry-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: #6366f1;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.show-entry-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.show-entry-actions .action-icon {
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    min-width: unset;
+}
+
 /* ---- Movie List ---- */
 .movie-list {
     display: flex;

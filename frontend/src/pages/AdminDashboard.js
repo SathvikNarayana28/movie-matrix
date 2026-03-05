@@ -27,15 +27,15 @@ function AdminDashboard() {
         posterUrl: "", trailerUrl: "", cast: "", director: ""
     });
 
-    // ---- Show fields (part of "Add Movie" form) ----
-    const [showFields, setShowFields] = useState({
-        theater: "", date: "", time: "", price: ""
-    });
+    // ---- Show fields (part of "Add Movie" form) — supports multiple shows ----
+    const [showFieldsList, setShowFieldsList] = useState([
+        { theater: "", date: "", time: "", price: "" }
+    ]);
 
-    // ---- Quick Add Show ----
-    const [quickShow, setQuickShow] = useState({
-        movie: "", theater: "", date: "", time: "", price: ""
-    });
+    // ---- Quick Add Show — supports multiple shows ----
+    const [quickShowList, setQuickShowList] = useState([
+        { movie: "", theater: "", date: "", time: "", price: "" }
+    ]);
 
     // ---- Theatre form state ----
     const [theatreForm, setTheatreForm] = useState({
@@ -166,11 +166,51 @@ function AdminDashboard() {
 
     const resetMovieForm = () => {
         setMovieForm({ tmdbId: "", title: "", genre: "", language: "", duration: "", releaseDate: "", rating: "", description: "", posterUrl: "", trailerUrl: "", cast: "", director: "" });
-        setShowFields({ theater: "", date: "", time: "", price: "" });
+        setShowFieldsList([{ theater: "", date: "", time: "", price: "" }]);
         setSearchQuery(""); setTmdbResults([]); setEditingMovie(null);
     };
 
-    // ---- Add Movie + Show ----
+    // ---- Helpers for multi-show fields ----
+    const updateShowField = (index, field, value) => {
+        setShowFieldsList(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+    };
+    const addShowFieldRow = () => {
+        setShowFieldsList(prev => [...prev, { theater: "", date: "", time: "", price: "" }]);
+    };
+    const removeShowFieldRow = (index) => {
+        setShowFieldsList(prev => prev.filter((_, i) => i !== index));
+    };
+    const duplicateShowFieldRow = (index) => {
+        setShowFieldsList(prev => {
+            const copy = { ...prev[index] };
+            const newList = [...prev];
+            newList.splice(index + 1, 0, copy);
+            return newList;
+        });
+    };
+
+    const updateQuickShow = (index, field, value) => {
+        setQuickShowList(prev => prev.map((s, i) => i === index ? { ...s, [field]: value } : s));
+    };
+    const addQuickShowRow = () => {
+        setQuickShowList(prev => {
+            const last = prev[prev.length - 1] || {};
+            return [...prev, { movie: last.movie || "", theater: last.theater || "", date: "", time: "", price: last.price || "" }];
+        });
+    };
+    const removeQuickShowRow = (index) => {
+        setQuickShowList(prev => prev.filter((_, i) => i !== index));
+    };
+    const duplicateQuickShowRow = (index) => {
+        setQuickShowList(prev => {
+            const copy = { ...prev[index] };
+            const newList = [...prev];
+            newList.splice(index + 1, 0, copy);
+            return newList;
+        });
+    };
+
+    // ---- Add Movie + Show(s) ----
     const handleAddMovieShow = async (e) => {
         e.preventDefault(); clearMessages(); setSubmitting(true);
         try {
@@ -191,8 +231,7 @@ function AdminDashboard() {
                     rating: Number(movieForm.rating) || 0, description: movieForm.description,
                     posterUrl: movieForm.posterUrl, trailerUrl: movieForm.trailerUrl,
                     cast: movieForm.cast, director: movieForm.director,
-                    theater: showFields.theater, date: showFields.date,
-                    time: showFields.time, price: Number(showFields.price)
+                    shows: showFieldsList.map(s => ({ theater: s.theater, date: s.date, time: s.time, price: Number(s.price) }))
                 };
                 const res = await API.post("/admin/add-movie-show", payload);
                 setMsg(res.data.msg); resetMovieForm(); fetchMovies(); fetchShows(); fetchOverview();
@@ -201,18 +240,17 @@ function AdminDashboard() {
         finally { setSubmitting(false); }
     };
 
-    // ---- Quick Add Show ----
+    // ---- Quick Add Show(s) ----
     const handleQuickAddShow = async (e) => {
         e.preventDefault(); clearMessages(); setSubmitting(true);
         try {
             const res = await API.post("/admin/shows", {
-                movie: quickShow.movie, theater: quickShow.theater,
-                date: quickShow.date, time: quickShow.time, price: Number(quickShow.price)
+                shows: quickShowList.map(s => ({ movie: s.movie, theater: s.theater, date: s.date, time: s.time, price: Number(s.price) }))
             });
             setMsg(res.data.msg);
-            setQuickShow({ movie: "", theater: "", date: "", time: "", price: "" });
+            setQuickShowList([{ movie: "", theater: "", date: "", time: "", price: "" }]);
             fetchShows(); fetchOverview();
-        } catch (err) { setError(err.response?.data?.msg || "Failed to add show"); }
+        } catch (err) { setError(err.response?.data?.msg || "Failed to add show(s)"); }
         finally { setSubmitting(false); }
     };
 
@@ -473,21 +511,37 @@ function AdminDashboard() {
 
                             {!editingMovie && (
                                 <div className="show-subsection">
-                                    <h4>First Show Details</h4>
-                                    <div className="form-row">
-                                        <div className="form-group">
-                                            <label>Theatre *</label>
-                                            <select value={showFields.theater} onChange={(e) => setShowFields({ ...showFields, theater: e.target.value })} required>
-                                                <option value="">Select Theatre</option>
-                                                {theatres.map(t => <option key={t._id} value={t._id}>{t.name} — {t.area}</option>)}
-                                            </select>
+                                    <div className="show-subsection-header">
+                                        <h4>Show Details ({showFieldsList.length})</h4>
+                                        <button type="button" className="btn-outline btn-sm" onClick={addShowFieldRow}>+ Add Another Show</button>
+                                    </div>
+                                    {showFieldsList.map((sf, idx) => (
+                                        <div key={idx} className="multi-show-entry">
+                                            <div className="multi-show-entry-header">
+                                                <span className="show-entry-label">Show #{idx + 1}</span>
+                                                <div className="show-entry-actions">
+                                                    <button type="button" className="action-icon" onClick={() => duplicateShowFieldRow(idx)} title="Duplicate">📋</button>
+                                                    {showFieldsList.length > 1 && (
+                                                        <button type="button" className="action-icon danger" onClick={() => removeShowFieldRow(idx)} title="Remove">✕</button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="form-row">
+                                                <div className="form-group">
+                                                    <label>Theatre *</label>
+                                                    <select value={sf.theater} onChange={(e) => updateShowField(idx, 'theater', e.target.value)} required>
+                                                        <option value="">Select Theatre</option>
+                                                        {theatres.map(t => <option key={t._id} value={t._id}>{t.name} — {t.area}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div className="form-group"><label>Price (₹) *</label><input type="number" value={sf.price} onChange={(e) => updateShowField(idx, 'price', e.target.value)} required /></div>
+                                            </div>
+                                            <div className="form-row">
+                                                <div className="form-group"><label>Date *</label><input type="date" value={sf.date} onChange={(e) => updateShowField(idx, 'date', e.target.value)} required /></div>
+                                                <div className="form-group"><label>Time *</label><input type="time" value={sf.time} onChange={(e) => updateShowField(idx, 'time', e.target.value)} required /></div>
+                                            </div>
                                         </div>
-                                        <div className="form-group"><label>Price (₹) *</label><input type="number" value={showFields.price} onChange={(e) => setShowFields({ ...showFields, price: e.target.value })} required /></div>
-                                    </div>
-                                    <div className="form-row">
-                                        <div className="form-group"><label>Date *</label><input type="date" value={showFields.date} onChange={(e) => setShowFields({ ...showFields, date: e.target.value })} required /></div>
-                                        <div className="form-group"><label>Time *</label><input type="time" value={showFields.time} onChange={(e) => setShowFields({ ...showFields, time: e.target.value })} required /></div>
-                                    </div>
+                                    ))}
                                 </div>
                             )}
 
@@ -529,30 +583,48 @@ function AdminDashboard() {
             {activeTab === "shows" && (
                 <div className="tab-content">
                     <div className="section-card">
-                        <h3>Add Show for Existing Movie</h3>
+                        <div className="show-subsection-header">
+                            <h3>Add Shows for Existing Movie</h3>
+                            <button type="button" className="btn-outline btn-sm" onClick={addQuickShowRow}>+ Add Another Show</button>
+                        </div>
                         <form onSubmit={handleQuickAddShow}>
-                            <div className="form-row">
-                                <div className="form-group">
-                                    <label>Movie *</label>
-                                    <select value={quickShow.movie} onChange={(e) => setQuickShow({ ...quickShow, movie: e.target.value })} required>
-                                        <option value="">Select Movie</option>
-                                        {movies.filter(m => m.nowShowing).map(m => <option key={m._id} value={m._id}>{m.title} ({m.language})</option>)}
-                                    </select>
+                            {quickShowList.map((qs, idx) => (
+                                <div key={idx} className="multi-show-entry">
+                                    <div className="multi-show-entry-header">
+                                        <span className="show-entry-label">Show #{idx + 1}</span>
+                                        <div className="show-entry-actions">
+                                            <button type="button" className="action-icon" onClick={() => duplicateQuickShowRow(idx)} title="Duplicate">📋</button>
+                                            {quickShowList.length > 1 && (
+                                                <button type="button" className="action-icon danger" onClick={() => removeQuickShowRow(idx)} title="Remove">✕</button>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="form-row">
+                                        <div className="form-group">
+                                            <label>Movie *</label>
+                                            <select value={qs.movie} onChange={(e) => updateQuickShow(idx, 'movie', e.target.value)} required>
+                                                <option value="">Select Movie</option>
+                                                {movies.filter(m => m.nowShowing).map(m => <option key={m._id} value={m._id}>{m.title} ({m.language})</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Theatre *</label>
+                                            <select value={qs.theater} onChange={(e) => updateQuickShow(idx, 'theater', e.target.value)} required>
+                                                <option value="">Select Theatre</option>
+                                                {theatres.map(t => <option key={t._id} value={t._id}>{t.name} — {t.area}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div className="form-row">
+                                        <div className="form-group"><label>Date *</label><input type="date" value={qs.date} onChange={(e) => updateQuickShow(idx, 'date', e.target.value)} required /></div>
+                                        <div className="form-group"><label>Time *</label><input type="time" value={qs.time} onChange={(e) => updateQuickShow(idx, 'time', e.target.value)} required /></div>
+                                        <div className="form-group"><label>Price (₹) *</label><input type="number" value={qs.price} onChange={(e) => updateQuickShow(idx, 'price', e.target.value)} required /></div>
+                                    </div>
                                 </div>
-                                <div className="form-group">
-                                    <label>Theatre *</label>
-                                    <select value={quickShow.theater} onChange={(e) => setQuickShow({ ...quickShow, theater: e.target.value })} required>
-                                        <option value="">Select Theatre</option>
-                                        {theatres.map(t => <option key={t._id} value={t._id}>{t.name} — {t.area}</option>)}
-                                    </select>
-                                </div>
-                            </div>
-                            <div className="form-row">
-                                <div className="form-group"><label>Date *</label><input type="date" value={quickShow.date} onChange={(e) => setQuickShow({ ...quickShow, date: e.target.value })} required /></div>
-                                <div className="form-group"><label>Time *</label><input type="time" value={quickShow.time} onChange={(e) => setQuickShow({ ...quickShow, time: e.target.value })} required /></div>
-                                <div className="form-group"><label>Price (₹) *</label><input type="number" value={quickShow.price} onChange={(e) => setQuickShow({ ...quickShow, price: e.target.value })} required /></div>
-                            </div>
-                            <button type="submit" className="btn-primary" disabled={submitting}>{submitting ? "Adding..." : "Add Show"}</button>
+                            ))}
+                            <button type="submit" className="btn-primary" disabled={submitting}>
+                                {submitting ? "Adding..." : `Add ${quickShowList.length} Show${quickShowList.length > 1 ? "s" : ""}`}
+                            </button>
                         </form>
                     </div>
 

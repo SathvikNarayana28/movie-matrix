@@ -238,16 +238,31 @@ router.post("/add-movie-show", async (req, res) => {
             tmdbId, title, genre, language, duration,
             releaseDate, rating, description, posterUrl,
             trailerUrl, cast, director,
-            // Show fields
-            theater, date, time, price
+            // Show fields — supports single show (legacy) or multiple shows
+            theater, date, time, price,
+            shows // array of { theater, date, time, price }
         } = req.body;
 
         // --- Validate required fields ---
         if (!title || !posterUrl) {
             return res.status(400).json({ msg: "Title and Poster URL are required" });
         }
-        if (!theater || !date || !time || !price) {
-            return res.status(400).json({ msg: "Theatre, Date, Time, and Price are required for the show" });
+
+        // Build show list: use `shows` array if provided, else fall back to single fields
+        const showList = Array.isArray(shows) && shows.length > 0
+            ? shows
+            : (theater && date && time && price) ? [{ theater, date, time, price }] : [];
+
+        if (showList.length === 0) {
+            return res.status(400).json({ msg: "At least one show (Theatre, Date, Time, Price) is required" });
+        }
+
+        // Validate every show entry
+        for (let i = 0; i < showList.length; i++) {
+            const s = showList[i];
+            if (!s.theater || !s.date || !s.time || !s.price) {
+                return res.status(400).json({ msg: `Show #${i + 1}: Theatre, Date, Time, and Price are all required` });
+            }
         }
 
         // --- Step 1: Check if movie already exists (by tmdbId) ---
@@ -276,32 +291,35 @@ router.post("/add-movie-show", async (req, res) => {
             await movie.save();
         }
 
-        // --- Step 3: Validate theatre exists ---
-        const theaterDoc = await Theater.findById(theater);
-        if (!theaterDoc) {
-            return res.status(404).json({ msg: "Theatre not found" });
+        // --- Step 3: Create all showtimes ---
+        const createdShowtimes = [];
+        for (const show of showList) {
+            const theaterDoc = await Theater.findById(show.theater);
+            if (!theaterDoc) {
+                return res.status(404).json({ msg: `Theatre not found for show on ${show.date} at ${show.time}` });
+            }
+
+            const totalSeats = theaterDoc.totalSeatsPerScreen || 100;
+            const seatsPerRow = 10;
+            const rows = Math.ceil(totalSeats / seatsPerRow);
+            const seats = generateSeats(rows, seatsPerRow);
+
+            const showtime = new Showtime({
+                movie: movie._id,
+                theater: theaterDoc._id,
+                date: show.date,
+                time: show.time,
+                price: Number(show.price),
+                seats
+            });
+            await showtime.save();
+            createdShowtimes.push(showtime);
         }
 
-        // --- Step 4: Create the show (showtime) with auto-generated seats ---
-        const totalSeats = theaterDoc.totalSeatsPerScreen || 100;
-        const seatsPerRow = 10;
-        const rows = Math.ceil(totalSeats / seatsPerRow);
-        const seats = generateSeats(rows, seatsPerRow);
-
-        const showtime = new Showtime({
-            movie: movie._id,
-            theater: theaterDoc._id,
-            date,
-            time,
-            price: Number(price),
-            seats
-        });
-        await showtime.save();
-
         res.status(201).json({
-            msg: "Movie & Show added successfully",
+            msg: `Movie & ${createdShowtimes.length} show(s) added successfully`,
             movie,
-            showtime
+            showtimes: createdShowtimes
         });
 
     } catch (err) {
@@ -409,35 +427,54 @@ router.delete("/theatres/:id", async (req, res) => {
 //  SHOWS (SHOWTIMES) — Admin CRUD
 // =============================================
 
-// ADD SHOW (links Movie _id + Theatre _id) — auto-generates seat layout
+// ADD SHOW(S) (links Movie _id + Theatre _id) — auto-generates seat layout
+// Accepts single show OR { shows: [...] } for bulk creation
 router.post("/shows", async (req, res) => {
     try {
-        const { movie, theater, date, time, price } = req.body;
+        const { movie, theater, date, time, price, shows } = req.body;
 
-        // Validate movie and theater exist
-        const movieExists = await Movie.findById(movie);
-        if (!movieExists) return res.status(404).json({ msg: "Movie not found" });
+        // Build show list: array or single
+        const showList = Array.isArray(shows) && shows.length > 0
+            ? shows
+            : [{ movie, theater, date, time, price }];
 
-        const theaterExists = await Theater.findById(theater);
-        if (!theaterExists) return res.status(404).json({ msg: "Theatre not found" });
+        // Validate all entries
+        for (let i = 0; i < showList.length; i++) {
+            const s = showList[i];
+            if (!s.movie || !s.theater || !s.date || !s.time || !s.price) {
+                return res.status(400).json({ msg: `Show #${i + 1}: Movie, Theatre, Date, Time, and Price are all required` });
+            }
+        }
 
-        // Auto-generate seats based on theatre's totalSeatsPerScreen
-        const totalSeats = theaterExists.totalSeatsPerScreen || 100;
-        const seatsPerRow = 10;
-        const rows = Math.ceil(totalSeats / seatsPerRow);
-        const seats = generateSeats(rows, seatsPerRow);
+        const createdShowtimes = [];
+        for (const show of showList) {
+            const movieExists = await Movie.findById(show.movie);
+            if (!movieExists) return res.status(404).json({ msg: `Movie not found for show #${createdShowtimes.length + 1}` });
 
-        const showtime = new Showtime({
-            movie,
-            theater,
-            date,
-            time,
-            price,
-            seats
+            const theaterExists = await Theater.findById(show.theater);
+            if (!theaterExists) return res.status(404).json({ msg: `Theatre not found for show #${createdShowtimes.length + 1}` });
+
+            const totalSeats = theaterExists.totalSeatsPerScreen || 100;
+            const seatsPerRow = 10;
+            const rows = Math.ceil(totalSeats / seatsPerRow);
+            const seats = generateSeats(rows, seatsPerRow);
+
+            const showtime = new Showtime({
+                movie: show.movie,
+                theater: show.theater,
+                date: show.date,
+                time: show.time,
+                price: Number(show.price),
+                seats
+            });
+            await showtime.save();
+            createdShowtimes.push(showtime);
+        }
+
+        res.status(201).json({
+            msg: `${createdShowtimes.length} show(s) added successfully`,
+            showtimes: createdShowtimes
         });
-
-        await showtime.save();
-        res.status(201).json({ msg: "Show added successfully", showtime });
     } catch (err) {
         console.error("Admin add show error:", err.message);
         res.status(500).json({ msg: err.message || "Server Error" });

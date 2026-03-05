@@ -6,7 +6,11 @@ import "./AiChat.css";
 function AiChat() {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState([
-        { role: "bot", text: "Hi! I'm your Movie Matrix AI assistant. Tell me your mood or what kind of movie you're looking for, and I'll find the perfect pick for you! 🎬" }
+        {
+            role: "bot",
+            text: "Hi! I'm your Movie Matrix AI assistant. I can help you with:\n\n🎬 Movie recommendations & info\n🎟️ Booking tickets & managing bookings\n📍 Finding nearby theatres\n❓ General questions — ask me anything!\n\nWhat can I help you with?",
+            quickReplies: ["What's playing today?", "Show my bookings", "How do I book tickets?", "Surprise me with a movie!"]
+        }
     ]);
     const [input, setInput] = useState("");
     const [loading, setLoading] = useState(false);
@@ -75,8 +79,10 @@ function AiChat() {
                 ...prev,
                 {
                     role: "bot",
-                    text: data.message || "I couldn't find a good match. Try describing your mood differently!",
-                    recommendations: data.recommendations || []
+                    text: data.message || "I couldn't understand that. Could you rephrase?",
+                    recommendations: data.recommendations || [],
+                    actions: data.actions || [],
+                    quickReplies: data.quickReplies || []
                 }
             ]);
         } catch (err) {
@@ -108,6 +114,78 @@ function AiChat() {
         setIsOpen(false);
     };
 
+    const handleActionClick = (action) => {
+        if (action.type === "navigate" && action.route) {
+            navigate(action.route);
+            setIsOpen(false);
+        } else if (action.type === "link" && action.route) {
+            window.open(action.route, "_blank");
+        }
+    };
+
+    const handleQuickReply = (text) => {
+        if (loading) return;
+        setInput(text);
+        // Trigger send after setting input
+        setTimeout(() => {
+            const updatedMessages = [...messages, { role: "user", text }];
+            setMessages(updatedMessages);
+            setInput("");
+            setLoading(true);
+
+            const sendHistory = updatedMessages
+                .filter(m => m.role === "user" || m.role === "bot")
+                .slice(-10)
+                .map(m => ({ role: m.role === "user" ? "user" : "model", text: m.text }));
+
+            const sendPayload = { message: text, history: sendHistory };
+            if (userLocation) {
+                sendPayload.userLat = userLocation.lat;
+                sendPayload.userLng = userLocation.lng;
+            }
+
+            API.post("/ai/chat", sendPayload)
+                .then(res => {
+                    setMessages(prev => [
+                        ...prev,
+                        {
+                            role: "bot",
+                            text: res.data.message || "I couldn't understand that. Could you rephrase?",
+                            recommendations: res.data.recommendations || [],
+                            actions: res.data.actions || [],
+                            quickReplies: res.data.quickReplies || []
+                        }
+                    ]);
+                })
+                .catch(err => {
+                    const errorMsg = err.response?.data?.msg || "Something went wrong. Please try again.";
+                    setMessages(prev => [...prev, { role: "bot", text: errorMsg }]);
+                })
+                .finally(() => setLoading(false));
+        }, 50);
+    };
+
+    // Format bot message text with basic markdown-like formatting
+    const formatMessage = (text) => {
+        if (!text) return text;
+        // Split by newlines and render
+        return text.split("\n").map((line, i) => {
+            // Bold text: **text**
+            const parts = line.split(/(\*\*[^*]+\*\*)/g).map((part, j) => {
+                if (part.startsWith("**") && part.endsWith("**")) {
+                    return <strong key={j}>{part.slice(2, -2)}</strong>;
+                }
+                return part;
+            });
+            return (
+                <React.Fragment key={i}>
+                    {i > 0 && <br />}
+                    {parts}
+                </React.Fragment>
+            );
+        });
+    };
+
     // Don't render for logged-out users
     if (!token) return null;
 
@@ -125,8 +203,9 @@ function AiChat() {
             {/* Chat Window — always in DOM, toggled via CSS class */}
             <div className={`ai-chat-window ${isOpen ? "open" : ""}`}>
                 <div className="ai-chat-header">
-                    <div>
-                        🤖 Movie Matrix AI
+                    <div className="ai-chat-header-info">
+                        <span className="ai-chat-header-title">🤖 Movie Matrix AI</span>
+                        <span className="ai-chat-header-subtitle">Your smart assistant</span>
                     </div>
                     <button className="ai-chat-close" onClick={() => setIsOpen(false)}>✕</button>
                 </div>
@@ -135,7 +214,7 @@ function AiChat() {
                     {messages.map((msg, i) => (
                         <div key={i}>
                             <div className={`ai-msg ${msg.role}`}>
-                                {msg.text}
+                                {msg.role === "bot" ? formatMessage(msg.text) : msg.text}
                             </div>
                             {/* Recommendation cards */}
                             {msg.recommendations && msg.recommendations.length > 0 && (
@@ -180,6 +259,36 @@ function AiChat() {
                                     ))}
                                 </div>
                             )}
+                            {/* Action buttons */}
+                            {msg.actions && msg.actions.length > 0 && (
+                                <div className="ai-action-buttons">
+                                    {msg.actions.map((action, j) => (
+                                        <button
+                                            key={j}
+                                            className="ai-action-btn"
+                                            onClick={() => handleActionClick(action)}
+                                        >
+                                            {action.type === "navigate" ? "📄 " : "🔗 "}
+                                            {action.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            {/* Quick reply chips */}
+                            {msg.quickReplies && msg.quickReplies.length > 0 && i === messages.length - 1 && (
+                                <div className="ai-quick-replies">
+                                    {msg.quickReplies.map((qr, j) => (
+                                        <button
+                                            key={j}
+                                            className="ai-quick-reply-chip"
+                                            onClick={() => handleQuickReply(qr)}
+                                            disabled={loading}
+                                        >
+                                            {qr}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                     ))}
                     {loading && (
@@ -194,7 +303,7 @@ function AiChat() {
                     <input
                         ref={inputRef}
                         className="ai-chat-input"
-                        placeholder="Try: 'Something thrilling tonight'..."
+                        placeholder="Ask me anything..."
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyDown}
