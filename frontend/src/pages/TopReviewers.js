@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import API from "../api";
 import "./TopReviewers.css";
 
+// TopReviewers — embeddable section component for the Reviews Feed page
+// Calls GET /api/reviews/top-reviewers and shows top 5 users
+
 function TopReviewers() {
     const [reviewers, setReviewers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -12,7 +15,8 @@ function TopReviewers() {
         const fetchTopReviewers = async () => {
             try {
                 const res = await API.get("/reviews/top-reviewers");
-                setReviewers(res.data);
+                // Show only top 5 reviewers
+                setReviewers(res.data.slice(0, 5));
             } catch (err) {
                 console.error("Top reviewers error:", err);
                 setError("Failed to load top reviewers.");
@@ -31,18 +35,16 @@ function TopReviewers() {
         ));
     };
 
-    if (loading) return <p className="tr-loading">Loading leaderboard...</p>;
-    if (error) return <p className="tr-error">{error}</p>;
+    if (loading) return <p className="tr-section-loading">Loading top reviewers...</p>;
+    if (error) return <p className="tr-section-error">{error}</p>;
 
     return (
-        <div className="top-reviewers-page">
-            <h2 className="tr-title">🏆 Top Reviewers</h2>
-            <p className="tr-subtitle">Most active critics in Movie Matrix</p>
+        <div className="tr-section">
+            <h3 className="section-title">🏆 Top Reviewers</h3>
+            <p className="section-subtitle">Most active critics in Movie Matrix</p>
 
             {reviewers.length === 0 ? (
-                <div className="tr-empty">
-                    <p>No reviews yet. Be the first to review a movie!</p>
-                </div>
+                <p className="tr-section-empty">No reviews yet. Be the first to review a movie!</p>
             ) : (
                 <div className="tr-list">
                     {reviewers.map((reviewer, index) => (
@@ -63,7 +65,7 @@ function TopReviewers() {
                                     </span>
                                     <span className="tr-separator">·</span>
                                     <span className="tr-avg-rating">
-                                        {renderStars(reviewer.avgRating)} {reviewer.avgRating}
+                                        {renderStars(reviewer.avgRating)} {reviewer.avgRating.toFixed(1)}
                                     </span>
                                 </div>
                             </div>

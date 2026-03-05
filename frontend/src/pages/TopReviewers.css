@@ -1,64 +1,54 @@
-.top-reviewers-page {
-    max-width: 600px;
-    margin: 0 auto;
-    padding: 30px 20px;
+/* ===== Top Reviewers Section (embedded in Reviews Feed) ===== */
+
+.tr-section {
+    background: #f8f9fa;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
 }
 
-.tr-title {
-    font-size: 24px;
-    font-weight: 700;
-    color: #1a1a2e;
-    margin: 0 0 4px;
-}
-
-.tr-subtitle {
-    font-size: 14px;
-    color: #888;
-    margin: 0 0 24px;
-}
-
-.tr-loading,
-.tr-error {
+.tr-section-loading,
+.tr-section-error {
     text-align: center;
-    padding: 40px 20px;
+    padding: 16px;
     color: #777;
+    font-size: 14px;
 }
 
-.tr-error {
+.tr-section-error {
     color: #e94560;
 }
 
-.tr-empty {
+.tr-section-empty {
     text-align: center;
-    padding: 40px 20px;
-    background: #f9f9f9;
-    border-radius: 10px;
-    color: #777;
+    color: #999;
+    font-size: 14px;
+    padding: 12px 0;
 }
 
 /* Leaderboard List */
 .tr-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 10px;
 }
 
 .tr-card {
     display: flex;
     align-items: center;
-    gap: 14px;
+    gap: 12px;
     background: #fff;
     border: 1px solid #eee;
-    border-radius: 10px;
-    padding: 16px;
+    border-radius: 8px;
+    padding: 12px 14px;
     transition: box-shadow 0.2s;
 }
 
 .tr-card:hover {
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 }
 
-/* Top 3 get special border */
+/* Top 3 get special left border */
 .tr-card:nth-child(1) {
     border-left: 4px solid #ffd700;
 }
@@ -72,20 +62,20 @@
 }
 
 .tr-rank {
-    font-size: 22px;
+    font-size: 20px;
     font-weight: 700;
-    min-width: 36px;
+    min-width: 32px;
     text-align: center;
     color: #1a1a2e;
 }
 
 .tr-avatar {
-    width: 44px;
-    height: 44px;
+    width: 38px;
+    height: 38px;
     border-radius: 50%;
     background-color: #1a1a2e;
     color: #fff;
-    font-size: 20px;
+    font-size: 17px;
     font-weight: bold;
     display: flex;
     align-items: center;
@@ -99,12 +89,12 @@
 }
 
 .tr-name {
-    font-size: 16px;
+    font-size: 15px;
     font-weight: 600;
     color: #1a1a2e;
     text-decoration: none;
     display: block;
-    margin-bottom: 4px;
+    margin-bottom: 3px;
 }
 
 .tr-name:hover {
@@ -114,41 +104,41 @@
 .tr-stats {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
 }
 
 .tr-review-count {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     color: #e94560;
 }
 
 .tr-separator {
     color: #ccc;
-    font-size: 13px;
+    font-size: 12px;
 }
 
 .tr-avg-rating {
-    font-size: 13px;
+    font-size: 12px;
     color: #666;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 3px;
 }
 
 @media (max-width: 600px) {
     .tr-card {
-        padding: 12px;
-        gap: 10px;
+        padding: 10px;
+        gap: 8px;
     }
     .tr-rank {
-        font-size: 18px;
-        min-width: 28px;
+        font-size: 16px;
+        min-width: 26px;
     }
     .tr-avatar {
-        width: 36px;
-        height: 36px;
-        font-size: 16px;
+        width: 32px;
+        height: 32px;
+        font-size: 14px;
     }
 }
