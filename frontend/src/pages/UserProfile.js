@@ -3,6 +3,12 @@ import { useParams, Link } from "react-router-dom";
 import API from "../api";
 import "./UserProfile.css";
 
+const API_BASE = process.env.REACT_APP_API_BASE_URL
+    ? process.env.REACT_APP_API_BASE_URL.replace("/api", "")
+    : (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+        ? "http://localhost:5000"
+        : "";
+
 function UserProfile() {
     const { userId } = useParams();
     const [profile, setProfile] = useState(null);
@@ -87,9 +93,17 @@ function UserProfile() {
     return (
         <div className="user-profile-page">
             <div className="up-card">
-                <div className="up-avatar">
-                    {profile.name.charAt(0).toUpperCase()}
-                </div>
+                {profile.profilePic ? (
+                    <img
+                        src={`${API_BASE}${profile.profilePic}`}
+                        alt={profile.name}
+                        className="up-avatar-img"
+                    />
+                ) : (
+                    <div className="up-avatar">
+                        {profile.name.charAt(0).toUpperCase()}
+                    </div>
+                )}
                 <h2 className="up-name">{profile.name}</h2>
                 <p className="up-joined">
                     Joined {new Date(profile.joinedDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}

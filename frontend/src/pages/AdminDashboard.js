@@ -29,17 +29,17 @@ function AdminDashboard() {
 
     // ---- Show fields (part of "Add Movie" form) — supports multiple shows ----
     const [showFieldsList, setShowFieldsList] = useState([
-        { theater: "", date: "", time: "", price: "" }
+        { theater: "", date: "", time: "", minPrice: "", maxPrice: "" }
     ]);
 
     // ---- Quick Add Show — supports multiple shows ----
     const [quickShowList, setQuickShowList] = useState([
-        { movie: "", theater: "", date: "", time: "", price: "" }
+        { movie: "", theater: "", date: "", time: "", minPrice: "", maxPrice: "" }
     ]);
 
     // ---- Theatre form state ----
     const [theatreForm, setTheatreForm] = useState({
-        name: "", city: "", area: "", screens: "", totalSeatsPerScreen: ""
+        name: "", city: "", area: "", location: "", screens: "", totalSeatsPerScreen: ""
     });
 
     // ---- Data lists ----
@@ -195,7 +195,7 @@ function AdminDashboard() {
     const addQuickShowRow = () => {
         setQuickShowList(prev => {
             const last = prev[prev.length - 1] || {};
-            return [...prev, { movie: last.movie || "", theater: last.theater || "", date: "", time: "", price: last.price || "" }];
+            return [...prev, { movie: last.movie || "", theater: last.theater || "", date: "", time: "", minPrice: last.minPrice || "", maxPrice: last.maxPrice || "" }];
         });
     };
     const removeQuickShowRow = (index) => {
@@ -231,7 +231,7 @@ function AdminDashboard() {
                     rating: Number(movieForm.rating) || 0, description: movieForm.description,
                     posterUrl: movieForm.posterUrl, trailerUrl: movieForm.trailerUrl,
                     cast: movieForm.cast, director: movieForm.director,
-                    shows: showFieldsList.map(s => ({ theater: s.theater, date: s.date, time: s.time, price: Number(s.price) }))
+                    shows: showFieldsList.map(s => ({ theater: s.theater, date: s.date, time: s.time, minPrice: Number(s.minPrice), maxPrice: Number(s.maxPrice) }))
                 };
                 const res = await API.post("/admin/add-movie-show", payload);
                 setMsg(res.data.msg); resetMovieForm(); fetchMovies(); fetchShows(); fetchOverview();
@@ -245,10 +245,10 @@ function AdminDashboard() {
         e.preventDefault(); clearMessages(); setSubmitting(true);
         try {
             const res = await API.post("/admin/shows", {
-                shows: quickShowList.map(s => ({ movie: s.movie, theater: s.theater, date: s.date, time: s.time, price: Number(s.price) }))
+                shows: quickShowList.map(s => ({ movie: s.movie, theater: s.theater, date: s.date, time: s.time, minPrice: Number(s.minPrice), maxPrice: Number(s.maxPrice) }))
             });
             setMsg(res.data.msg);
-            setQuickShowList([{ movie: "", theater: "", date: "", time: "", price: "" }]);
+            setQuickShowList([{ movie: "", theater: "", date: "", time: "", minPrice: "", maxPrice: "" }]);
             fetchShows(); fetchOverview();
         } catch (err) { setError(err.response?.data?.msg || "Failed to add show(s)"); }
         finally { setSubmitting(false); }
@@ -258,12 +258,16 @@ function AdminDashboard() {
     const handleAddTheatre = async (e) => {
         e.preventDefault(); clearMessages();
         try {
+            // Auto-generate Google Maps URL from the address
+            const locationQuery = theatreForm.location || `${theatreForm.name}, ${theatreForm.area}, ${theatreForm.city}`;
+            const mapUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locationQuery)}`;
             const res = await API.post("/admin/theatres", {
-                ...theatreForm, screens: Number(theatreForm.screens),
+                ...theatreForm, location: mapUrl,
+                screens: Number(theatreForm.screens),
                 totalSeatsPerScreen: Number(theatreForm.totalSeatsPerScreen)
             });
             setMsg(res.data.msg);
-            setTheatreForm({ name: "", city: "", area: "", screens: "", totalSeatsPerScreen: "" });
+            setTheatreForm({ name: "", city: "", area: "", location: "", screens: "", totalSeatsPerScreen: "" });
             fetchTheatres(); fetchOverview();
         } catch (err) { setError(err.response?.data?.msg || "Failed to add theatre"); }
     };
@@ -534,7 +538,8 @@ function AdminDashboard() {
                                                         {theatres.map(t => <option key={t._id} value={t._id}>{t.name} — {t.area}</option>)}
                                                     </select>
                                                 </div>
-                                                <div className="form-group"><label>Price (₹) *</label><input type="number" value={sf.price} onChange={(e) => updateShowField(idx, 'price', e.target.value)} required /></div>
+                                                <div className="form-group"><label>Min Price (₹) *</label><input type="number" placeholder="Regular" value={sf.minPrice} onChange={(e) => updateShowField(idx, 'minPrice', e.target.value)} required /></div>
+                                                <div className="form-group"><label>Max Price (₹) *</label><input type="number" placeholder="Gold" value={sf.maxPrice} onChange={(e) => updateShowField(idx, 'maxPrice', e.target.value)} required /></div>
                                             </div>
                                             <div className="form-row">
                                                 <div className="form-group"><label>Date *</label><input type="date" value={sf.date} onChange={(e) => updateShowField(idx, 'date', e.target.value)} required /></div>
@@ -618,7 +623,8 @@ function AdminDashboard() {
                                     <div className="form-row">
                                         <div className="form-group"><label>Date *</label><input type="date" value={qs.date} onChange={(e) => updateQuickShow(idx, 'date', e.target.value)} required /></div>
                                         <div className="form-group"><label>Time *</label><input type="time" value={qs.time} onChange={(e) => updateQuickShow(idx, 'time', e.target.value)} required /></div>
-                                        <div className="form-group"><label>Price (₹) *</label><input type="number" value={qs.price} onChange={(e) => updateQuickShow(idx, 'price', e.target.value)} required /></div>
+                                        <div className="form-group"><label>Min Price (₹) *</label><input type="number" placeholder="Regular" value={qs.minPrice} onChange={(e) => updateQuickShow(idx, 'minPrice', e.target.value)} required /></div>
+                                        <div className="form-group"><label>Max Price (₹) *</label><input type="number" placeholder="Gold" value={qs.maxPrice} onChange={(e) => updateQuickShow(idx, 'maxPrice', e.target.value)} required /></div>
                                     </div>
                                 </div>
                             ))}
@@ -639,7 +645,7 @@ function AdminDashboard() {
                                     <div className="list-row-info">
                                         <strong>{s.movie?.title || "Unknown"}</strong>
                                         <span>{s.theater?.name || "Unknown"} ({s.theater?.area || ""})</span>
-                                        <span>{s.date} • {s.time} • ₹{s.price}</span>
+                                        <span>{s.date} • {s.time} • ₹{s.pricing ? `${s.pricing.regular}–${s.pricing.gold}` : s.price}</span>
                                     </div>
                                     <button className="action-icon danger" onClick={() => handleDeleteShow(s._id)} title="Delete">🗑️</button>
                                 </div>
@@ -662,6 +668,7 @@ function AdminDashboard() {
                                 <div className="form-group"><label>Area *</label><input type="text" value={theatreForm.area} onChange={(e) => setTheatreForm({ ...theatreForm, area: e.target.value })} placeholder="Gachibowli" required /></div>
                             </div>
                             <div className="form-row">
+                                <div className="form-group" style={{ flex: 2 }}><label>Address (for Google Maps)</label><input type="text" value={theatreForm.location} onChange={(e) => setTheatreForm({ ...theatreForm, location: e.target.value })} placeholder="e.g. AMB Cinemas Gachibowli Hyderabad" /></div>
                                 <div className="form-group"><label>Screens *</label><input type="number" value={theatreForm.screens} onChange={(e) => setTheatreForm({ ...theatreForm, screens: e.target.value })} required /></div>
                                 <div className="form-group"><label>Seats Per Screen *</label><input type="number" value={theatreForm.totalSeatsPerScreen} onChange={(e) => setTheatreForm({ ...theatreForm, totalSeatsPerScreen: e.target.value })} required /></div>
                             </div>
@@ -678,7 +685,15 @@ function AdminDashboard() {
                                         <h4>{t.name}</h4>
                                         <button className="action-icon danger" onClick={() => handleDeleteTheatre(t._id)}>🗑️</button>
                                     </div>
-                                    <p>📍 {t.area}, {t.city}</p>
+                                    <p>
+                                        {t.location ? (
+                                            <a href={t.location} target="_blank" rel="noopener noreferrer" className="theatre-map-link">
+                                                📍 {t.area}, {t.city}
+                                            </a>
+                                        ) : (
+                                            <>📍 {t.area}, {t.city}</>
+                                        )}
+                                    </p>
                                     <p>🖥️ {t.screens} screens &nbsp;|&nbsp; 💺 {t.totalSeatsPerScreen} seats/screen</p>
                                 </div>
                             ))}

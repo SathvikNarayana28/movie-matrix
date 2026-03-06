@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api";
 import MovieCard from "../components/MovieCard";
+import { MovieCardSkeleton } from "../components/Skeleton";
 import "./Home.css";
 
 function Home() {
@@ -18,6 +19,8 @@ function Home() {
     const [nearbyTheatres, setNearbyTheatres] = useState([]);
     const [selectedCity, setSelectedCity] = useState(() => localStorage.getItem("selectedCity") || "Hyderabad");
     const [recommendations, setRecommendations] = useState([]);
+    const [recsLoading, setRecsLoading] = useState(true);
+    const [recsProfile, setRecsProfile] = useState(null);
 
     // --- Suggestions state ---
     const [suggestions, setSuggestions] = useState({ local: [], external: [] });
@@ -74,9 +77,16 @@ function Home() {
         // Fetch AI-powered recommendations (only if logged in)
         const token = localStorage.getItem("token");
         if (token) {
+            setRecsLoading(true);
             API.get("/ai/recommend")
-                .then((res) => setRecommendations(res.data.recommendations || []))
-                .catch((err) => console.error("Error fetching recommendations:", err));
+                .then((res) => {
+                    setRecommendations(res.data.recommendations || []);
+                    setRecsProfile(res.data.profile || null);
+                })
+                .catch((err) => console.error("Error fetching recommendations:", err))
+                .finally(() => setRecsLoading(false));
+        } else {
+            setRecsLoading(false);
         }
     }, [fetchFavorites]);
 
@@ -197,37 +207,59 @@ function Home() {
             <h2 className="home-heading">🎬 Now Showing</h2>
 
             {/* ===== AI Recommended For You ===== */}
-            {recommendations.length > 0 && (
+            {localStorage.getItem("token") && (
                 <div className="recommendations-section">
-                    <h2 className="home-heading">🤖 Recommended For You</h2>
-                    <div className="recommendations-scroll">
-                        {recommendations.map((rec, idx) => (
-                            <div
-                                key={idx}
-                                className="rec-card"
-                                onClick={() => rec.suggestedShowtime
-                                    ? navigate(`/book/${rec.suggestedShowtime.showtimeId}`)
-                                    : navigate(`/movie/${rec.movie._id}`)}
-                            >
-                                <img
-                                    src={rec.movie.posterUrl}
-                                    alt={rec.movie.title}
-                                    className="rec-poster"
-                                    onError={(e) => { e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='180'%3E%3Crect width='120' height='180' fill='%23222'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666' font-size='14'%3EN/A%3C/text%3E%3C/svg%3E"; }}
-                                />
-                                <div className="rec-info">
-                                    <span className="rec-title">{rec.movie.title}</span>
-                                    <span className="rec-score">Match: {Math.round(rec.score * 100)}%</span>
-                                    {rec.suggestedShowtime && (
-                                        <span className="rec-showtime">
-                                            📍 {rec.suggestedShowtime.theater} • {rec.suggestedShowtime.time}
-                                        </span>
-                                    )}
-                                    <span className="rec-reason">{rec.reason}</span>
-                                </div>
-                            </div>
-                        ))}
+                    <div className="rec-header">
+                        <h2 className="home-heading">🤖 Recommended For You</h2>
+                        {recsProfile && recsProfile.topGenres && recsProfile.topGenres.length > 0 && (
+                            <span className="rec-profile-hint">
+                                Based on your interest in {recsProfile.topGenres.slice(0, 2).join(", ")}
+                            </span>
+                        )}
                     </div>
+                    {recsLoading ? (
+                        <div className="recommendations-scroll">
+                            {[...Array(5)].map((_, i) => (
+                                <div key={i} className="rec-skeleton-wrapper">
+                                    <MovieCardSkeleton />
+                                </div>
+                            ))}
+                        </div>
+                    ) : recommendations.length === 0 ? (
+                        <p className="rec-empty">We're still learning your taste. Browse, review, and favorite movies to get personalized picks!</p>
+                    ) : (
+                        <div className="recommendations-scroll">
+                            {recommendations.map((rec, idx) => (
+                                <div
+                                    key={idx}
+                                    className="rec-card"
+                                    onClick={() => rec.suggestedShowtime
+                                        ? navigate(`/book/${rec.suggestedShowtime.showtimeId}`)
+                                        : !rec.isTmdb ? navigate(`/movie/${rec.movie._id}`) : null}
+                                >
+                                    <img
+                                        src={rec.movie.posterUrl}
+                                        alt={rec.movie.title}
+                                        className="rec-poster"
+                                        onError={(e) => { e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='180'%3E%3Crect width='120' height='180' fill='%23222'/%3E%3Ctext x='50%25' y='50%25' text-anchor='middle' dy='.3em' fill='%23666' font-size='14'%3EN/A%3C/text%3E%3C/svg%3E"; }}
+                                    />
+                                    <div className="rec-info">
+                                        <span className="rec-title">{rec.movie.title}</span>
+                                        <span className="rec-score">
+                                            {rec.isTmdb ? `⭐ ${rec.movie.rating?.toFixed(1)}/10` : `Match: ${Math.round(rec.score * 100)}%`}
+                                        </span>
+                                        {rec.suggestedShowtime && (
+                                            <span className="rec-showtime">
+                                                📍 {rec.suggestedShowtime.theater} • {rec.suggestedShowtime.time}
+                                            </span>
+                                        )}
+                                        <span className="rec-reason">{rec.reason}</span>
+                                    </div>
+                                    {rec.isTmdb && <span className="rec-tmdb-badge">TMDB</span>}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -363,7 +395,13 @@ function Home() {
                 </select>
             </div>
 
-            {loading && <p className="loading-text">Loading movies...</p>}
+            {loading && (
+                <div className="movie-grid">
+                    {[...Array(8)].map((_, i) => (
+                        <MovieCardSkeleton key={i} />
+                    ))}
+                </div>
+            )}
 
             {!loading && error && <p className="error-text">{error}</p>}
 

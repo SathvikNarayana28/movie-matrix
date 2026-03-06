@@ -1,4 +1,5 @@
 const User = require("../models/User");
+const Review = require("../models/Review");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
@@ -65,7 +66,12 @@ exports.getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select("-password");
         if (!user) return res.status(404).json({ msg: "User not found" });
-        res.json(user);
+
+        const reviewCount = await Review.countDocuments({ user: req.user.id });
+
+        const userObj = user.toObject();
+        userObj.reviewCount = reviewCount;
+        res.json(userObj);
     } catch (err) {
         console.error(err);
         res.status(500).json({ msg: "Server Error" });

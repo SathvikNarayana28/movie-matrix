@@ -27,17 +27,27 @@
 }
 
 .up-avatar {
-    width: 70px;
-    height: 70px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     background-color: #1a1a2e;
     color: #fff;
-    font-size: 30px;
+    font-size: 32px;
     font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
     margin: 0 auto 14px;
+}
+
+.up-avatar-img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid #e94560;
+    margin: 0 auto 14px;
+    display: block;
 }
 
 .up-name {

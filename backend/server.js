@@ -22,6 +22,9 @@ const app = express();   // <-- app is created HERE
 app.use(cors());
 app.use(express.json());
 
+// Serve uploaded files (profile pics, etc.)
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/movies", movieRoutes);
@@ -104,14 +107,14 @@ mongoose.connect(process.env.MONGO_URI, {
         if (theaterCount === 0) {
             console.log("Seeding Hyderabad theatres...");
             const theaters = [
-                { name: "AMB Cinemas", city: "Hyderabad", area: "Gachibowli", screens: 4, totalSeatsPerScreen: 100 },
-                { name: "PVR Next Galleria", city: "Hyderabad", area: "Panjagutta", screens: 5, totalSeatsPerScreen: 80 },
-                { name: "Asian Cinemas", city: "Hyderabad", area: "Uppal", screens: 3, totalSeatsPerScreen: 120 },
-                { name: "Prasads Multiplex", city: "Hyderabad", area: "Necklace Road", screens: 6, totalSeatsPerScreen: 100 },
-                { name: "INOX GVK One", city: "Hyderabad", area: "Banjara Hills", screens: 4, totalSeatsPerScreen: 90 },
-                { name: "Cinepolis", city: "Hyderabad", area: "Kompally", screens: 3, totalSeatsPerScreen: 100 },
-                { name: "Sudarshan 35mm", city: "Hyderabad", area: "RTC X Roads", screens: 1, totalSeatsPerScreen: 150 },
-                { name: "Miraj Cinemas", city: "Hyderabad", area: "Kukatpally", screens: 4, totalSeatsPerScreen: 80 }
+                { name: "AMB Cinemas", city: "Hyderabad", area: "Gachibowli", location: "AMB Cinemas, Gachibowli, Hyderabad, Telangana", screens: 4, totalSeatsPerScreen: 100 },
+                { name: "PVR Next Galleria", city: "Hyderabad", area: "Panjagutta", location: "PVR Next Galleria Mall, Panjagutta, Hyderabad, Telangana", screens: 5, totalSeatsPerScreen: 80 },
+                { name: "Asian Cinemas", city: "Hyderabad", area: "Uppal", location: "Asian Cinemas, Uppal, Hyderabad, Telangana", screens: 3, totalSeatsPerScreen: 120 },
+                { name: "Prasads Multiplex", city: "Hyderabad", area: "Necklace Road", location: "Prasads Multiplex, Necklace Road, Hyderabad, Telangana", screens: 6, totalSeatsPerScreen: 100 },
+                { name: "INOX GVK One", city: "Hyderabad", area: "Banjara Hills", location: "INOX GVK One Mall, Banjara Hills, Hyderabad, Telangana", screens: 4, totalSeatsPerScreen: 90 },
+                { name: "Cinepolis", city: "Hyderabad", area: "Kompally", location: "Cinepolis, Kompally, Hyderabad, Telangana", screens: 3, totalSeatsPerScreen: 100 },
+                { name: "Sudarshan 35mm", city: "Hyderabad", area: "RTC X Roads", location: "Sudarshan 35mm, RTC X Roads, Hyderabad, Telangana", screens: 1, totalSeatsPerScreen: 150 },
+                { name: "Miraj Cinemas", city: "Hyderabad", area: "Kukatpally", location: "Miraj Cinemas, Kukatpally, Hyderabad, Telangana", screens: 4, totalSeatsPerScreen: 80 }
             ];
             await Theater.insertMany(theaters);
             console.log(`${theaters.length} Hyderabad theatres seeded.`);

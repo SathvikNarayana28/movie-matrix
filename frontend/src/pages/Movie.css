@@ -240,17 +240,32 @@
     margin-bottom: 14px;
 }
 
-.theatre-group-name {
+.theatre-location {
+    display: flex;
+    align-items: center;
+    gap: 6px;
     font-size: 16px;
-    font-weight: 700;
+    font-weight: 600;
+    text-decoration: none;
     color: #1a1a2e;
+    transition: color 0.2s ease;
     margin: 0 0 2px;
+}
+
+.theatre-location:hover {
+    color: #e63946;
+}
+
+.map-pin {
+    color: #e63946;
+    font-size: 16px;
+    flex-shrink: 0;
 }
 
 .theatre-group-area {
     font-size: 13px;
     color: #777;
-    margin: 0;
+    margin: 2px 0 0 22px;
 }
 
 .theatre-group-screens {
@@ -264,8 +279,8 @@
 
 .theatre-shows-row {
     display: flex;
-    gap: 12px;
-    overflow-x: auto;
+    flex-wrap: wrap;
+    gap: 10px;
     padding-bottom: 4px;
 }
 
@@ -278,25 +293,29 @@
     border-radius: 2px;
 }
 
+/* ===== Available (>50%) — Green ===== */
 .show-slot {
     flex: 0 0 auto;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 3px;
-    padding: 10px 16px;
-    border: 1px solid #e94560;
+    gap: 4px;
+    padding: 10px 18px;
+    border: 1px solid #00a650;
     border-radius: 8px;
     background: #fff;
     cursor: pointer;
-    transition: all 0.2s;
-    min-width: 100px;
+    transition: all 0.2s ease;
+    min-width: 110px;
     font-family: inherit;
+    position: relative;
 }
 
 .show-slot:hover:not(:disabled) {
-    background: #e94560;
+    background: #00a650;
     color: #fff;
+    box-shadow: 0 4px 12px rgba(0, 166, 80, 0.35);
+    transform: translateY(-2px);
 }
 
 .show-slot:hover:not(:disabled) .slot-date,
@@ -305,16 +324,22 @@
     color: #fff;
 }
 
+/* ===== Sold Out (0 seats) ===== */
 .show-slot.sold-out {
     border-color: #ccc;
     background: #f5f5f5;
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.55;
 }
 
 .slot-time {
     font-size: 15px;
     font-weight: 700;
+    color: #00a650;
+}
+
+.show-slot:hover:not(:disabled) .slot-time {
+    color: #fff;
 }
 
 .slot-date {
@@ -342,24 +367,65 @@
     color: #e65100;
 }
 
+.slot-seats.seat-critical {
+    color: #d32f2f;
+}
+
 .filling-fast-label {
-    font-size: 10px;
+    font-size: 9px;
     font-weight: 700;
     color: #fff;
-    background: #e94560;
     padding: 2px 8px;
     border-radius: 8px;
     letter-spacing: 0.5px;
     margin-top: 2px;
+    text-transform: uppercase;
 }
 
-.show-slot.filling-fast {
-    border-color: #e65100;
+.filling-fast-label.fast-filling {
+    background: linear-gradient(135deg, #ff6b00, #ff9800);
 }
 
-.show-slot.filling-fast:hover:not(:disabled) {
+.filling-fast-label.almost-full {
+    background: linear-gradient(135deg, #d32f2f, #f44336);
+}
+
+/* ===== Fast Filling (20–50%) — Orange ===== */
+.show-slot.fast-filling {
+    border-color: #ff9800;
+}
+
+.show-slot.fast-filling .slot-time {
+    color: #e65100;
+}
+
+.show-slot.fast-filling:hover:not(:disabled) {
     background: #e65100;
     border-color: #e65100;
+    box-shadow: 0 4px 12px rgba(230, 81, 0, 0.35);
+}
+
+.show-slot.fast-filling:hover:not(:disabled) .slot-time {
+    color: #fff;
+}
+
+/* ===== Almost Full (<20%) — Red ===== */
+.show-slot.almost-full {
+    border-color: #d32f2f;
+}
+
+.show-slot.almost-full .slot-time {
+    color: #d32f2f;
+}
+
+.show-slot.almost-full:hover:not(:disabled) {
+    background: #d32f2f;
+    border-color: #d32f2f;
+    box-shadow: 0 4px 12px rgba(211, 47, 47, 0.35);
+}
+
+.show-slot.almost-full:hover:not(:disabled) .slot-time {
+    color: #fff;
 }
 
 @media (max-width: 600px) {

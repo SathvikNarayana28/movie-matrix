@@ -1,6 +1,7 @@
 const Movie = require("../models/Movie");
 const Showtime = require("../models/Showtime");
 const { buildUserProfile, getTimeSlot } = require("./profileBuilder");
+const { fetchTrending, discoverMoviesByGenre } = require("./tmdbService");
 
 /**
  * Generate personalized movie recommendations for a user.
@@ -196,8 +197,68 @@ async function getRecommendations(userId, limit = 5) {
         scored.sort((a, b) => (b.movie.rating || 0) - (a.movie.rating || 0));
     }
 
+    let finalRecs = scored.slice(0, limit);
+
+    // 6. TMDB fallback — fill remaining slots if not enough local recommendations
+    if (finalRecs.length < limit) {
+        try {
+            const topGenreNames = Object.entries(profile.genreWeights)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 2)
+                .map(e => e[0]);
+
+            // Reverse map genre names to TMDB IDs
+            const GENRE_ID_MAP = {
+                "Action": 28, "Adventure": 12, "Animation": 16, "Comedy": 35,
+                "Crime": 80, "Documentary": 99, "Drama": 18, "Family": 10751,
+                "Fantasy": 14, "History": 36, "Horror": 27, "Music": 10402,
+                "Mystery": 9648, "Romance": 10749, "Sci-Fi": 878, "Thriller": 53,
+                "War": 10752, "Western": 37
+            };
+
+            let tmdbMovies = [];
+            if (topGenreNames.length > 0 && GENRE_ID_MAP[topGenreNames[0]]) {
+                tmdbMovies = await discoverMoviesByGenre(GENRE_ID_MAP[topGenreNames[0]]);
+            } else {
+                tmdbMovies = await fetchTrending();
+            }
+
+            // Filter out movies already in recommendations
+            const existingTitles = new Set(finalRecs.map(r => r.movie.title.toLowerCase()));
+            const existingIds = new Set(finalRecs.map(r => r.movie._id?.toString()));
+
+            for (const tm of tmdbMovies) {
+                if (finalRecs.length >= limit) break;
+                if (existingTitles.has(tm.title.toLowerCase())) continue;
+                if (tm.tmdbId && existingIds.has(tm.tmdbId)) continue;
+
+                finalRecs.push({
+                    movie: {
+                        _id: `tmdb_${tm.tmdbId}`,
+                        title: tm.title,
+                        genre: tm.genre,
+                        language: tm.language,
+                        rating: tm.rating,
+                        posterUrl: tm.posterUrl,
+                        duration: 0,
+                        cast: [],
+                        director: ""
+                    },
+                    score: Math.round((tm.rating / 10) * 100) / 100,
+                    reason: topGenreNames.length > 0
+                        ? `Popular in ${topGenreNames[0]} • From TMDB`
+                        : "Trending now • From TMDB",
+                    suggestedShowtime: null,
+                    isTmdb: true
+                });
+            }
+        } catch (tmdbErr) {
+            console.error("TMDB fallback error:", tmdbErr.message);
+        }
+    }
+
     return {
-        recommendations: scored.slice(0, limit),
+        recommendations: finalRecs,
         profile: {
             topGenres: Object.entries(profile.genreWeights)
                 .sort((a, b) => b[1] - a[1])

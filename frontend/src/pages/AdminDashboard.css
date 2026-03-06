@@ -719,6 +719,17 @@
     color: #666;
 }
 
+.theatre-map-link {
+    color: #1a73e8;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.theatre-map-link:hover {
+    color: #e63946;
+    text-decoration: underline;
+}
+
 /* ---- Analytics ---- */
 .analytics-bar {
     display: flex;

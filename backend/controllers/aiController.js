@@ -71,7 +71,7 @@ function classifyIntent(message) {
  */
 exports.getRecommendations = async (req, res) => {
     try {
-        const result = await getRecommendations(req.user.id, 6);
+        const result = await getRecommendations(req.user.id, 8);
         res.json(result);
     } catch (err) {
         console.error("Recommendation error:", err.message);

@@ -5,7 +5,7 @@ const { generateSeats } = require("../models/Showtime");
 // ADD A NEW SHOWTIME (with auto-generated seats)
 exports.addShowtime = async (req, res) => {
     try {
-        const { movie, theater, date, time, price } = req.body;
+        const { movie, theater, date, time, price, minPrice, maxPrice } = req.body;
 
         // Look up the theatre to get totalSeatsPerScreen
         const theaterDoc = await Theater.findById(theater);
@@ -18,12 +18,22 @@ exports.addShowtime = async (req, res) => {
         const rows = Math.ceil(totalSeats / seatsPerRow);
         const seats = generateSeats(rows, seatsPerRow);
 
+        // Build pricing from min/max or fallback to single price
+        const min = Number(minPrice) || Number(price) || 150;
+        const max = Number(maxPrice) || Number(price) || 300;
+        const pricing = {
+            regular: min,
+            silver: Math.round((min + max) / 2),
+            gold: max
+        };
+
         const showtime = new Showtime({
             movie,
             theater,
             date,
             time,
-            price,
+            price: min,
+            pricing,
             seats
         });
 
@@ -41,7 +51,7 @@ exports.getAllShowtimes = async (req, res) => {
     try {
         const showtimes = await Showtime.find()
             .populate("movie", "title posterUrl language")     // fill in movie details
-            .populate("theater", "name city area");            // fill in theater details
+            .populate("theater", "name city area location");   // fill in theater details
 
         res.json(showtimes);
 
@@ -56,7 +66,7 @@ exports.getShowtimesByMovie = async (req, res) => {
     try {
         const showtimes = await Showtime.find({ movie: req.params.movieId })
             .populate("movie", "title posterUrl language")
-            .populate("theater", "name city area");
+            .populate("theater", "name city area location");
 
         res.json(showtimes);
 
@@ -71,7 +81,7 @@ exports.getShowtimeById = async (req, res) => {
     try {
         const showtime = await Showtime.findById(req.params.id)
             .populate("movie", "title posterUrl language")
-            .populate("theater", "name city area");
+            .populate("theater", "name city area location");
 
         if (!showtime) {
             return res.status(404).json({ msg: "Showtime not found" });

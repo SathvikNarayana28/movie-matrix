@@ -1,5 +1,6 @@
 const Booking = require("../models/Booking");
 const User = require("../models/User");
+const Review = require("../models/Review");
 const Showtime = require("../models/Showtime");
 
 /**
@@ -130,19 +131,50 @@ async function buildUserProfile(userId) {
         }
     }
 
-    // 5. Normalize weights to 0-1 range
+    // 5. Boost weights from user's reviews (strong engagement signal, weight scales with rating)
+    const reviews = await Review.find({ user: userId })
+        .populate("movie", "title genre cast director language rating _id")
+        .lean();
+
+    for (const rev of reviews) {
+        if (!rev.movie) continue;
+        const movie = rev.movie;
+        const ratingWeight = (rev.rating || 3) / 5; // 1-5 star → 0.2-1.0
+
+        watchedMovieIds.add(movie._id.toString());
+
+        if (Array.isArray(movie.genre)) {
+            for (const g of movie.genre) {
+                genreCounts[g] = (genreCounts[g] || 0) + ratingWeight;
+                if (rev.rating >= 4) favoriteGenres.add(g);
+            }
+        }
+        if (Array.isArray(movie.cast)) {
+            for (const actor of movie.cast) {
+                actorCounts[actor] = (actorCounts[actor] || 0) + (ratingWeight * 0.6);
+            }
+        }
+        if (movie.director) {
+            directorCounts[movie.director] = (directorCounts[movie.director] || 0) + (ratingWeight * 0.5);
+        }
+        if (movie.language) {
+            languageCounts[movie.language] = (languageCounts[movie.language] || 0) + (ratingWeight * 0.5);
+        }
+    }
+
+    // 6. Normalize weights to 0-1 range
     const genreWeights = normalize(genreCounts);
     const languageWeights = normalize(languageCounts);
 
-    // 6. Determine preferred time slot
+    // 7. Determine preferred time slot
     const preferredTimeSlot = Object.entries(timeSlotCounts)
         .sort((a, b) => b[1] - a[1])[0][0];
 
-    // 7. Sort theater preferences by visit count
+    // 8. Sort theater preferences by visit count
     const theaterPreferences = Object.values(theaterVisits)
         .sort((a, b) => b.visitCount - a.visitCount);
 
-    // 8. Get top actors/directors (top 5)
+    // 9. Get top actors/directors (top 5)
     const topActors = Object.entries(actorCounts)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)

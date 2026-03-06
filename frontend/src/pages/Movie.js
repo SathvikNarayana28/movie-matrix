@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { FaMapMarkerAlt } from "react-icons/fa";
 import API from "../api";
 import TrailerModal from "../components/TrailerModal";
 import "./Movie.css";
@@ -292,6 +293,18 @@ function Movie() {
         return st.seats.filter(s => !s.isBooked).length;
     };
 
+    // Seat availability status based on percentage
+    const getSeatStatus = (st) => {
+        if (!st.seats || !Array.isArray(st.seats) || st.seats.length === 0) return "available";
+        const total = st.seats.length;
+        const available = st.seats.filter(s => !s.isBooked).length;
+        if (available === 0) return "sold-out";
+        const ratio = available / total;
+        if (ratio > 0.5) return "available";
+        if (ratio > 0.2) return "fast-filling";
+        return "almost-full";
+    };
+
     return (
         <div className="movie-detail">
             <div className="movie-header">
@@ -373,40 +386,55 @@ function Movie() {
                 </p>
             ) : (
                 <div className="theatre-group-list">
-                    {Object.values(groupedByTheatre).map(({ theatre, shows }) => (
+                    {Object.values(groupedByTheatre).map(({ theatre, shows }) => {
+                        const mapHref = theatre.location && theatre.location.startsWith("http")
+                            ? theatre.location
+                            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(theatre.location || `${theatre.name}, ${theatre.area}, ${theatre.city}`)}`;
+                        return (
                         <div key={theatre._id} className="theatre-group">
                             <div className="theatre-group-header">
                                 <div>
-                                    <h4 className="theatre-group-name">{theatre.name}</h4>
-                                    <p className="theatre-group-area">📍 {theatre.area}, {theatre.city}</p>
+                                    <a
+                                        href={mapHref}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="theatre-location"
+                                        title="View on Google Maps"
+                                    >
+                                        <FaMapMarkerAlt className="map-pin" />
+                                        {theatre.name}
+                                    </a>
+                                    <p className="theatre-group-area">{theatre.area}, {theatre.city}</p>
                                 </div>
                                 <span className="theatre-group-screens">{theatre.screens} Screens</span>
                             </div>
                             <div className="theatre-shows-row">
                                 {shows.map((st) => {
                                     const available = getAvailableCount(st);
-                                    const isSoldOut = available === 0;
-                                    const fillingFast = !isSoldOut && available < 20;
+                                    const status = getSeatStatus(st);
+                                    const isSoldOut = status === "sold-out";
+                                    const statusLabel = status === "fast-filling" ? "Fast Filling"
+                                        : status === "almost-full" ? "Almost Full" : "";
                                     return (
                                         <button
                                             key={st._id}
-                                            className={`show-slot ${isSoldOut ? "sold-out" : ""} ${fillingFast ? "filling-fast" : ""}`}
+                                            className={`show-slot ${status}`}
                                             onClick={() => !isSoldOut && handleBookClick(st._id)}
                                             disabled={isSoldOut}
                                             title={isSoldOut ? "Sold Out" : `${available} seats available`}
                                         >
                                             <span className="slot-time">{st.time}</span>
-                                            <span className="slot-price">₹{st.price}</span>
-                                            <span className={`slot-seats ${isSoldOut ? "seat-zero" : fillingFast ? "seat-low" : ""}`}>
+                                            <span className="slot-price">{st.pricing && st.pricing.gold > 0 ? `₹${st.pricing.regular}–${st.pricing.gold}` : `₹${st.price}`}</span>
+                                            <span className={`slot-seats ${isSoldOut ? "seat-zero" : status === "almost-full" ? "seat-critical" : status === "fast-filling" ? "seat-low" : ""}`}>
                                                 {isSoldOut ? "Sold Out" : `${available} seats left`}
                                             </span>
-                                            {fillingFast && <span className="filling-fast-label">Filling Fast</span>}
+                                            {statusLabel && <span className={`filling-fast-label ${status}`}>{statusLabel}</span>}
                                         </button>
                                     );
                                 })}
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             )}
 

@@ -62,7 +62,7 @@ exports.createReview = async (req, res) => {
         });
 
         // Populate user name before returning
-        await review.populate("user", "name");
+        await review.populate("user", "name profilePic");
 
         res.status(201).json(review);
     } catch (err) {
@@ -108,7 +108,7 @@ exports.getMovieReviews = async (req, res) => {
     try {
         const movieId = req.params.movieId;
         const reviews = await Review.find({ movie: movieId })
-            .populate("user", "name")
+            .populate("user", "name profilePic")
             .sort({ createdAt: -1 });
 
         // Find all showtimes for this movie to check bookings
@@ -192,7 +192,7 @@ exports.updateReview = async (req, res) => {
         if (comment) review.comment = comment;
         await review.save();
 
-        await review.populate("user", "name");
+        await review.populate("user", "name profilePic");
         res.json(review);
     } catch (err) {
         console.error("Update review error:", err);
@@ -221,6 +221,41 @@ exports.deleteReview = async (req, res) => {
     }
 };
 
+// GET /api/reviews/all — All reviews on the platform (newest first)
+exports.getAllReviews = async (req, res) => {
+    try {
+        const reviews = await Review.find()
+            .populate("user", "name profilePic")
+            .populate("movie", "title posterUrl")
+            .populate("comments.user", "name profilePic")
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        // Compute verifiedViewer badge for each review
+        const reviewsWithBadge = await Promise.all(reviews.map(async (rev) => {
+            const revObj = rev.toObject();
+            if (rev.movie) {
+                const showtimeIds = await Showtime.find({ movie: rev.movie._id }).select("_id");
+                const sIds = showtimeIds.map(s => s._id);
+                const booking = await Booking.findOne({
+                    user: rev.user._id,
+                    showtime: { $in: sIds },
+                    status: "confirmed"
+                });
+                revObj.verifiedViewer = !!booking;
+            } else {
+                revObj.verifiedViewer = false;
+            }
+            return revObj;
+        }));
+
+        res.json(reviewsWithBadge);
+    } catch (err) {
+        console.error("All reviews error:", err);
+        res.status(500).json({ error: "Failed to fetch all reviews." });
+    }
+};
+
 // GET /api/reviews/feed — Reviews from the current user + users they follow (newest first)
 exports.getReviewsFeed = async (req, res) => {
     try {
@@ -233,8 +268,9 @@ exports.getReviewsFeed = async (req, res) => {
         const feedUserIds = [req.user.id, ...currentUser.following];
 
         const reviews = await Review.find({ user: { $in: feedUserIds } })
-            .populate("user", "name")
+            .populate("user", "name profilePic")
             .populate("movie", "title posterUrl")
+            .populate("comments.user", "name profilePic")
             .sort({ createdAt: -1 })
             .limit(50);
 
@@ -263,7 +299,7 @@ exports.getReviewsFeed = async (req, res) => {
     }
 };
 
-// GET /api/reviews/top-reviewers — Leaderboard of users with most reviews
+// GET /api/reviews/top-reviewers — Leaderboard of users sorted by total upvotes
 exports.getTopReviewers = async (req, res) => {
     try {
         const topReviewers = await Review.aggregate([
@@ -271,24 +307,27 @@ exports.getTopReviewers = async (req, res) => {
                 $group: {
                     _id: "$user",
                     reviewCount: { $sum: 1 },
-                    avgRating: { $avg: "$rating" }
+                    avgRating: { $avg: "$rating" },
+                    totalUpvotes: { $sum: { $size: { $ifNull: ["$upvotes", []] } } }
                 }
             },
-            { $sort: { reviewCount: -1 } },
+            { $sort: { totalUpvotes: -1 } },
             { $limit: 10 }
         ]);
 
         // Populate user names
         const populatedReviewers = await User.populate(topReviewers, {
             path: "_id",
-            select: "name"
+            select: "name profilePic"
         });
 
         const results = populatedReviewers.map(r => ({
             userId: r._id._id,
             name: r._id.name,
+            profilePic: r._id.profilePic || "",
             reviewCount: r.reviewCount,
-            avgRating: Math.round(r.avgRating * 10) / 10
+            avgRating: Math.round(r.avgRating * 10) / 10,
+            totalUpvotes: r.totalUpvotes
         }));
 
         res.json(results);
@@ -322,5 +361,112 @@ exports.toggleLikeReview = async (req, res) => {
     } catch (err) {
         console.error("Toggle like error:", err);
         res.status(500).json({ error: "Failed to toggle like." });
+    }
+};
+
+// POST /api/reviews/:reviewId/vote — Upvote or downvote a review (Reddit/Quora style)
+exports.voteReview = async (req, res) => {
+    try {
+        const { voteType } = req.body;
+        const userId = req.user.id;
+
+        if (!voteType || !["upvote", "downvote"].includes(voteType)) {
+            return res.status(400).json({ error: "voteType must be 'upvote' or 'downvote'." });
+        }
+
+        const review = await Review.findById(req.params.reviewId);
+        if (!review) {
+            return res.status(404).json({ error: "Review not found." });
+        }
+
+        const alreadyUpvoted = (review.upvotes || []).some(id => id.toString() === userId);
+        const alreadyDownvoted = (review.downvotes || []).some(id => id.toString() === userId);
+
+        if (voteType === "upvote") {
+            if (alreadyUpvoted) {
+                // Already upvoted → remove upvote (toggle off)
+                review.upvotes = review.upvotes.filter(id => id.toString() !== userId);
+            } else {
+                // Remove downvote if exists, then add upvote
+                if (alreadyDownvoted) {
+                    review.downvotes = review.downvotes.filter(id => id.toString() !== userId);
+                }
+                review.upvotes.push(userId);
+            }
+        } else {
+            // voteType === "downvote"
+            if (alreadyDownvoted) {
+                // Already downvoted → remove downvote (toggle off)
+                review.downvotes = review.downvotes.filter(id => id.toString() !== userId);
+            } else {
+                // Remove upvote if exists, then add downvote
+                if (alreadyUpvoted) {
+                    review.upvotes = review.upvotes.filter(id => id.toString() !== userId);
+                }
+                review.downvotes.push(userId);
+            }
+        }
+
+        await review.save();
+
+        res.json({
+            upvotes: review.upvotes,
+            downvotes: review.downvotes,
+            score: review.upvotes.length - review.downvotes.length
+        });
+    } catch (err) {
+        console.error("Vote review error:", err);
+        res.status(500).json({ error: "Failed to vote on review." });
+    }
+};
+
+// POST /api/reviews/:reviewId/comment — Add a comment to a review
+exports.addCommentToReview = async (req, res) => {
+    try {
+        const { text } = req.body;
+        const userId = req.user.id;
+
+        if (!text || text.trim().length === 0) {
+            return res.status(400).json({ error: "Comment text is required." });
+        }
+        if (text.length > 500) {
+            return res.status(400).json({ error: "Comment must be 500 characters or less." });
+        }
+
+        const review = await Review.findById(req.params.reviewId);
+        if (!review) {
+            return res.status(404).json({ error: "Review not found." });
+        }
+
+        // Push the new comment
+        review.comments.push({
+            user: userId,
+            text: text.trim(),
+            createdAt: new Date()
+        });
+
+        await review.save();
+
+        // Populate the user names in comments before returning
+        await review.populate("comments.user", "name profilePic");
+
+        res.status(201).json({ comments: review.comments });
+    } catch (err) {
+        console.error("Add comment error:", err);
+        res.status(500).json({ error: "Failed to add comment." });
+    }
+};
+
+// GET /api/reviews/user/:userId — All reviews by a specific user
+exports.getUserReviews = async (req, res) => {
+    try {
+        const reviews = await Review.find({ user: req.params.userId })
+            .populate("movie", "title posterUrl")
+            .sort({ createdAt: -1 });
+
+        res.json(reviews);
+    } catch (err) {
+        console.error("Get user reviews error:", err);
+        res.status(500).json({ error: "Failed to fetch user reviews." });
     }
 };

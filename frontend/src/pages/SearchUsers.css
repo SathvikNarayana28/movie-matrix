@@ -3,33 +3,33 @@
 .search-section {
     background: #f8f9fa;
     border-radius: 12px;
-    padding: 20px;
+    padding: 16px;
     margin-bottom: 24px;
 }
 
 .section-title {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 700;
     color: #1a1a2e;
     margin: 0 0 4px;
 }
 
 .section-subtitle {
-    font-size: 13px;
+    font-size: 12px;
     color: #888;
-    margin: 0 0 16px;
+    margin: 0 0 14px;
 }
 
 /* Search Bar */
 .search-bar-container {
     position: relative;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .search-input {
     width: 100%;
-    padding: 10px 14px;
-    font-size: 14px;
+    padding: 8px 12px;
+    font-size: 13px;
     border: 2px solid #e0e0e0;
     border-radius: 8px;
     outline: none;
@@ -45,10 +45,10 @@
 
 .search-spinner {
     position: absolute;
-    right: 14px;
+    right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    font-size: 12px;
+    font-size: 11px;
     color: #999;
 }
 
@@ -56,97 +56,119 @@
 .search-no-results {
     text-align: center;
     color: #999;
-    padding: 12px 0;
-    font-size: 14px;
+    padding: 10px 0;
+    font-size: 13px;
 }
 
-/* Result Cards */
+/* Result List — scrollable */
 .search-results {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-}
-
-.search-result-card {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #fff;
+    gap: 0;
+    max-height: 300px;
+    overflow-y: auto;
     border: 1px solid #eee;
     border-radius: 8px;
-    padding: 12px 14px;
-    transition: box-shadow 0.2s;
+    background: #fff;
+}
+
+.search-results::-webkit-scrollbar {
+    width: 4px;
+}
+
+.search-results::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+/* Each user row */
+.search-result-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    transition: background 0.2s ease, transform 0.2s ease;
+    border-bottom: 1px solid #f3f3f3;
+}
+
+.search-result-card:last-child {
+    border-bottom: none;
 }
 
 .search-result-card:hover {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+    background: #f4f6f8;
+    transform: translateX(3px);
 }
 
 .search-result-left {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.search-avatar-link {
+    text-decoration: none;
+    flex-shrink: 0;
 }
 
 .search-avatar {
-    width: 38px;
-    height: 38px;
+    width: 32px;
+    height: 32px;
     border-radius: 50%;
     background-color: #1a1a2e;
     color: #fff;
-    font-size: 17px;
+    font-size: 14px;
     font-weight: bold;
     display: flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
+    text-decoration: none;
 }
 
-.search-user-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
+.search-avatar-img {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #e94560;
 }
 
 .search-user-name {
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 600;
     color: #1a1a2e;
     text-decoration: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .search-user-name:hover {
     color: #e94560;
 }
 
-.search-user-stats {
-    font-size: 12px;
-    color: #888;
-}
-
-/* Action Buttons */
-.search-result-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
-
+/* Follow button */
 .search-follow-btn {
-    padding: 6px 16px;
-    font-size: 12px;
+    padding: 4px 12px;
+    font-size: 11px;
     font-weight: 600;
     border: none;
-    border-radius: 6px;
+    border-radius: 14px;
     cursor: pointer;
     font-family: inherit;
-    transition: all 0.2s;
+    transition: all 0.2s ease, transform 0.15s ease;
     background: #e94560;
     color: #fff;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .search-follow-btn:hover {
     background: #d63050;
+    transform: scale(1.08);
 }
 
 .search-follow-btn.search-following {
@@ -155,36 +177,12 @@
 }
 
 .search-follow-btn.search-following:hover {
-    background: #ddd;
-    color: #333;
-}
-
-.search-profile-btn {
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 600;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    text-decoration: none;
-    color: #555;
-    background: #fff;
-    transition: all 0.2s;
-}
-
-.search-profile-btn:hover {
-    border-color: #e94560;
-    color: #e94560;
+    background: #fce4ec;
+    color: #c62828;
 }
 
 @media (max-width: 600px) {
     .search-result-card {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
-    }
-
-    .search-result-actions {
-        width: 100%;
-        justify-content: flex-start;
+        padding: 8px;
     }
 }

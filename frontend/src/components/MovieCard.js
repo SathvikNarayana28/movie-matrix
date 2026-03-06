@@ -28,7 +28,14 @@ function MovieCard({ movie, isFavorite, onToggleFavorite }) {
                 <h3 className="movie-title">{movie.title}</h3>
                 <p className="movie-genre">{Array.isArray(movie.genre) ? movie.genre.join(", ") : movie.genre || ""}</p>
                 <div className="movie-meta">
-                    <span className="movie-rating">⭐ {movie.rating}/10</span>
+                    <span className="movie-rating">
+                        <span className="stars">
+                            {[1, 2, 3, 4, 5].map((i) => (
+                                <span key={i} className={`star ${i <= Math.round(movie.rating / 2) ? "filled" : "empty"}`}>★</span>
+                            ))}
+                        </span>
+                        {" "}{movie.rating}/10
+                    </span>
                     <span className="movie-language">{movie.language}</span>
                 </div>
             </div>

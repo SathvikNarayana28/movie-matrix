@@ -260,7 +260,7 @@ router.post("/add-movie-show", async (req, res) => {
         // Validate every show entry
         for (let i = 0; i < showList.length; i++) {
             const s = showList[i];
-            if (!s.theater || !s.date || !s.time || !s.price) {
+            if (!s.theater || !s.date || !s.time || (!s.price && !s.minPrice)) {
                 return res.status(400).json({ msg: `Show #${i + 1}: Theatre, Date, Time, and Price are all required` });
             }
         }
@@ -309,7 +309,12 @@ router.post("/add-movie-show", async (req, res) => {
                 theater: theaterDoc._id,
                 date: show.date,
                 time: show.time,
-                price: Number(show.price),
+                price: Number(show.minPrice) || Number(show.price) || 150,
+                pricing: {
+                    regular: Number(show.minPrice) || Number(show.price) || 150,
+                    silver: Math.round(((Number(show.minPrice) || Number(show.price) || 150) + (Number(show.maxPrice) || Number(show.price) || 300)) / 2),
+                    gold: Number(show.maxPrice) || Number(show.price) || 300
+                },
                 seats
             });
             await showtime.save();
@@ -441,7 +446,7 @@ router.post("/shows", async (req, res) => {
         // Validate all entries
         for (let i = 0; i < showList.length; i++) {
             const s = showList[i];
-            if (!s.movie || !s.theater || !s.date || !s.time || !s.price) {
+            if (!s.movie || !s.theater || !s.date || !s.time || (!s.price && !s.minPrice)) {
                 return res.status(400).json({ msg: `Show #${i + 1}: Movie, Theatre, Date, Time, and Price are all required` });
             }
         }
@@ -464,7 +469,12 @@ router.post("/shows", async (req, res) => {
                 theater: show.theater,
                 date: show.date,
                 time: show.time,
-                price: Number(show.price),
+                price: Number(show.minPrice) || Number(show.price) || 150,
+                pricing: {
+                    regular: Number(show.minPrice) || Number(show.price) || 150,
+                    silver: Math.round(((Number(show.minPrice) || Number(show.price) || 150) + (Number(show.maxPrice) || Number(show.price) || 300)) / 2),
+                    gold: Number(show.maxPrice) || Number(show.price) || 300
+                },
                 seats
             });
             await showtime.save();

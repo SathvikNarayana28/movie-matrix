@@ -34,7 +34,12 @@ const ShowtimeSchema = new mongoose.Schema({
     },
     date: { type: String, required: true },            // e.g. "2026-03-01"
     time: { type: String, required: true },            // e.g. "06:30 PM"
-    price: { type: Number, required: true },           // ticket price, e.g. 250
+    price: { type: Number, required: true },           // base ticket price (kept for backward compat)
+    pricing: {
+        regular: { type: Number, default: 0 },
+        silver: { type: Number, default: 0 },
+        gold: { type: Number, default: 0 }
+    },
     seats: [
         {
             seatId: { type: String, required: true },   // e.g. "A1"

@@ -1,7 +1,25 @@
 .feed-page {
-    max-width: 700px;
+    max-width: 1200px;
     margin: 0 auto;
     padding: 30px 20px;
+}
+
+/* Three-column grid layout */
+.feed-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr 260px;
+    gap: 24px;
+    align-items: start;
+}
+
+.feed-left-sidebar,
+.feed-right-sidebar {
+    position: sticky;
+    top: 90px;
+}
+
+.feed-main {
+    min-width: 0;
 }
 
 .feed-title {
@@ -20,6 +38,80 @@
 /* Section dividers */
 .feed-reviews-section {
     margin-top: 0;
+}
+
+/* Tab Bar — VS Code style */
+.feed-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 2px solid #e0e0e0;
+    margin-bottom: 20px;
+}
+
+.feed-tab {
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -2px;
+    cursor: pointer;
+    color: #888;
+    transition: color 0.2s, border-color 0.2s, transform 0.15s ease;
+}
+
+.feed-tab:hover {
+    color: #1a1a2e;
+    transform: translateY(-1px);
+}
+
+.feed-tab-active {
+    color: #e94560;
+    border-bottom-color: #e94560;
+}
+
+/* Sort bar — filter dropdown */
+.feed-sort-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 18px;
+}
+
+.feed-sort-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+}
+
+.feed-sort-select {
+    padding: 6px 30px 6px 12px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 500;
+    color: #1a1a2e;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    cursor: pointer;
+    outline: none;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23666'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.feed-sort-select:hover {
+    border-color: #bbb;
+}
+
+.feed-sort-select:focus {
+    border-color: #e94560;
+    box-shadow: 0 0 0 2px rgba(233, 69, 96, 0.1);
 }
 
 .feed-loading,
@@ -54,26 +146,28 @@
 .feed-list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
 }
 
 .feed-card {
     display: flex;
-    gap: 16px;
+    gap: 18px;
     background: #fff;
-    border: 1px solid #eee;
-    border-radius: 10px;
-    padding: 16px;
-    transition: box-shadow 0.2s;
+    border: none;
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 
 .feed-card:hover {
-    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+    transform: translateY(-4px);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
 .feed-poster {
-    width: 60px;
-    height: 90px;
+    width: 70px;
+    height: 105px;
     object-fit: cover;
     border-radius: 6px;
     flex-shrink: 0;
@@ -96,6 +190,34 @@
     align-items: center;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+.feed-reviewer-avatar-link {
+    text-decoration: none;
+    flex-shrink: 0;
+}
+
+.feed-reviewer-pic {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid #e94560;
+    box-shadow: 0 2px 6px rgba(233, 69, 96, 0.2);
+}
+
+.feed-reviewer-initial {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1a1a2e, #2d2d54);
+    color: #fff;
+    font-size: 15px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(26, 26, 46, 0.2);
 }
 
 .feed-reviewer-name {
@@ -126,24 +248,218 @@
 }
 
 .feed-movie-title {
-    font-size: 14px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 700;
     color: #1a1a2e;
-    margin: 0 0 6px;
+    margin: 2px 0 6px;
 }
 
 .feed-stars {
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 }
 
 .feed-comment {
     font-size: 14px;
     color: #444;
-    line-height: 1.5;
-    margin: 0 0 8px;
+    line-height: 1.6;
+    margin: 0 0 12px;
 }
 
-/* Like button */
+/* Vote row — horizontal at bottom of card */
+.feed-vote-row {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+    padding-top: 12px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.feed-vote-btn {
+    background: #eef0f3;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    font-family: inherit;
+    color: #222;
+    font-weight: 500;
+}
+
+.feed-upvote {
+    background: #e6f7ee;
+    color: #1a7a42;
+}
+
+.feed-downvote {
+    background: #fde8ec;
+    color: #b5303f;
+}
+
+.feed-vote-btn:hover {
+    background: #dde0e5;
+    transform: scale(1.05);
+}
+
+.feed-upvote:hover {
+    background: #d0edda;
+}
+
+.feed-downvote:hover {
+    background: #f5d0d7;
+}
+
+.feed-upvote.feed-voted {
+    background: #e8f5e9;
+    border-color: #4caf50;
+    color: #2e7d32;
+}
+
+.feed-downvote.feed-voted {
+    background: #fce4ec;
+    border-color: #e94560;
+    color: #c62828;
+}
+
+.feed-vote-count {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+/* Comment toggle button */
+.feed-comment-toggle {
+    background: #e8f0fe;
+    border: none;
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 13px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.2s;
+    font-family: inherit;
+    color: #1a56c4;
+    font-weight: 500;
+}
+
+.feed-comment-toggle:hover {
+    background: #d3e2fd;
+    transform: scale(1.05);
+}
+
+/* Comments section */
+.feed-comments-section {
+    margin-top: 10px;
+    border-top: 1px solid #f0f0f0;
+    padding-top: 10px;
+}
+
+.feed-comments-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.feed-comment-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.feed-comment-pic {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 1.5px solid #e94560;
+}
+
+.feed-comment-initial {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #1a1a2e;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.feed-comment-author {
+    font-weight: 600;
+    color: #1a1a2e;
+    flex-shrink: 0;
+}
+
+.feed-comment-text {
+    color: #444;
+    word-break: break-word;
+}
+
+.feed-comment-time {
+    font-size: 11px;
+    color: #aaa;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+/* Comment input row */
+.feed-comment-input-row {
+    display: flex;
+    gap: 8px;
+}
+
+.feed-comment-input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 13px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.feed-comment-input:focus {
+    border-color: #e94560;
+}
+
+.feed-comment-post-btn {
+    padding: 6px 14px;
+    background: #e94560;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.15s ease;
+}
+
+.feed-comment-post-btn:hover {
+    background: #d63050;
+    transform: scale(1.05);
+}
+
+.feed-comment-post-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+/* Like button (legacy — kept for backward compatibility) */
 .feed-actions {
     display: flex;
     align-items: center;
@@ -179,6 +495,17 @@
 .feed-like-count {
     font-size: 13px;
     font-weight: 600;
+}
+
+/* Responsive — collapse to single column on tablets */
+@media (max-width: 1024px) {
+    .feed-layout {
+        grid-template-columns: 1fr;
+    }
+    .feed-left-sidebar,
+    .feed-right-sidebar {
+        position: static;
+    }
 }
 
 @media (max-width: 600px) {

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "react-toastify";
 import API from "../api";
 import "./Login.css";
 
@@ -18,15 +19,20 @@ function Login() {
             localStorage.setItem("role", res.data.user?.role || "user");
             localStorage.setItem("userId", res.data.user?.id || "");
             const userRole = res.data.user?.role || "user";
+            toast.success("Login successful! Redirecting...");
             // Use window.location to navigate + reload in one step
             // so the navbar refreshes AND we land on the correct page
-            if (userRole === "admin") {
-                window.location.href = "/admin";
-            } else {
-                window.location.href = "/";
-            }
+            setTimeout(() => {
+                if (userRole === "admin") {
+                    window.location.href = "/admin";
+                } else {
+                    window.location.href = "/";
+                }
+            }, 1000);
         } catch (err) {
-            setError(err.response?.data?.msg || "Login failed. Try again.");
+            const msg = err.response?.data?.msg || "Login failed. Try again.";
+            setError(msg);
+            toast.error(msg);
         }
     };
 

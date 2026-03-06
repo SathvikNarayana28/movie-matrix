@@ -7,6 +7,13 @@ const ReviewSchema = new mongoose.Schema({
     comment: { type: String, required: true, maxlength: 1000 },
     isVerifiedViewer: { type: Boolean, default: true },               // true = user had a confirmed booking
     likes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],   // users who liked this review
+    upvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }],  // users who upvoted
+    downvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: "User" }], // users who downvoted
+    comments: [{
+        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        text: { type: String, required: true, maxlength: 500 },
+        createdAt: { type: Date, default: Date.now }
+    }],
     createdAt: { type: Date, default: Date.now }
 });
 

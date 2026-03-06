@@ -21,6 +21,7 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: "User"                                     // users this user follows
     }],
+    profilePic: { type: String, default: "" },
     resetPasswordToken: { type: String, default: null },     // hashed crypto token
     resetPasswordExpires: { type: Date, default: null }      // token expiry time
 }, { timestamps: true });

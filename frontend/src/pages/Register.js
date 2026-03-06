@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "react-toastify";
 import API from "../api";
 import "./Login.css";
 
@@ -29,11 +30,14 @@ function Register() {
         try {
             const res = await API.post("/auth/register", payload);
             setSuccess(res.data.msg + " Redirecting to login...");
+            toast.success("Registration successful! Redirecting to login...");
             setTimeout(() => {
                 window.location.href = "/login";
             }, 1500);
         } catch (err) {
-            setError(err.response?.data?.msg || "Registration failed. Try again.");
+            const msg = err.response?.data?.msg || "Registration failed. Try again.";
+            setError(msg);
+            toast.error(msg);
         }
     };
 
