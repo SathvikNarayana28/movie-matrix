@@ -16,9 +16,14 @@ exports.lockSeats = async (req, res) => {
         }
 
         // 1. Find show by ID
-        const showtime = await Showtime.findById(showtimeId);
+        const showtime = await Showtime.findById(showtimeId).populate("movie");
         if (!showtime) {
             return res.status(404).json({ msg: "Showtime not found" });
+        }
+
+        // Block booking if movie is on OTT
+        if (showtime.movie && showtime.movie.status === "OTT") {
+            return res.status(400).json({ msg: "This movie is now available on OTT. Theatre booking is disabled." });
         }
 
         const now = new Date();

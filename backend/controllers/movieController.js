@@ -331,6 +331,45 @@ exports.getTrailer = async (req, res) => {
     }
 };
 
+// GET OTT PROVIDERS for a movie (fetch from TMDB Watch Providers API)
+exports.getOttProviders = async (req, res) => {
+    try {
+        const movie = await Movie.findById(req.params.id);
+        if (!movie) {
+            return res.status(404).json({ msg: "Movie not found" });
+        }
+
+        if (!movie.tmdbId) {
+            return res.json({ providers: [] });
+        }
+
+        const TMDB_KEY = process.env.TMDB_API_KEY;
+        const url = `https://api.themoviedb.org/3/movie/${movie.tmdbId}/watch/providers?api_key=${TMDB_KEY}`;
+        const tmdbRes = await axios.get(url);
+        const results = tmdbRes.data?.results || {};
+
+        // Use IN region providers (India)
+        const inData = results?.IN || {};
+
+        // Extract streaming platforms from flatrate
+        const providers = (inData?.flatrate || []).map(p => ({
+            name: p.provider_name,
+            logo: `https://image.tmdb.org/t/p/original${p.logo_path}`
+        }));
+
+        // Auto-update movie status based on OTT availability
+        if (providers.length > 0 && movie.status !== "OTT") {
+            movie.status = "OTT";
+            await movie.save();
+        }
+
+        res.json({ providers, link: inData?.link || "" });
+    } catch (err) {
+        console.error("Error fetching OTT providers:", err.message);
+        res.status(500).json({ msg: "Failed to fetch OTT providers" });
+    }
+};
+
 // GET NEWLY RELEASED MOVIES (released within last 30 days)
 exports.getNewReleases = async (req, res) => {
     try {

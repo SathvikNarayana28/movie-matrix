@@ -12,7 +12,8 @@ const {
     getLanguages,
     getTrailer,
     getSuggestions,
-    getNewReleases
+    getNewReleases,
+    getOttProviders
 } = require("../controllers/movieController");
 
 // Public routes  - anyone can view movies
@@ -23,6 +24,7 @@ router.get("/suggestions", getSuggestions);   // GET    /api/movies/suggestions?
 router.get("/new-releases", getNewReleases);  // GET    /api/movies/new-releases
 router.get("/sync", syncMoviesFromTMDB);      // GET    /api/movies/sync
 router.get("/:id/trailer", getTrailer);       // GET    /api/movies/:id/trailer
+router.get("/:id/ott", getOttProviders);        // GET    /api/movies/:id/ott
 router.get("/:id", getMovieById);            // GET    /api/movies/:id
 
 // Protected routes - only logged-in users (later: admin only)

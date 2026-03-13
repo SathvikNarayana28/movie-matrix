@@ -19,6 +19,11 @@ function Movie() {
     const [trailerLoading, setTrailerLoading] = useState(false);
     const [trailerError, setTrailerError] = useState("");
 
+    // OTT providers state
+    const [ottProviders, setOttProviders] = useState([]);
+    const [ottLink, setOttLink] = useState("");
+    const [ottLoading, setOttLoading] = useState(true);
+
     // Review state
     const [reviews, setReviews] = useState([]);
     const [avgRating, setAvgRating] = useState(0);
@@ -41,6 +46,15 @@ function Movie() {
 
                 const showRes = await API.get(`/showtimes/movie/${id}`);
                 setShowtimes(showRes.data);
+
+                // Fetch OTT providers
+                API.get(`/movies/${id}/ott`)
+                    .then(ottRes => {
+                        setOttProviders(ottRes.data.providers || []);
+                        setOttLink(ottRes.data.link || "");
+                    })
+                    .catch(() => setOttProviders([]))
+                    .finally(() => setOttLoading(false));
 
                 // check if this movie is in user's favorites
                 const token = localStorage.getItem("token");
@@ -319,6 +333,9 @@ function Movie() {
                 <div className="detail-info">
                     <h2>
                         {movie.title}
+                        <span className={`status-badge status-${(movie.status || "In Theatres").toLowerCase().replace(/\s+/g, "-")}`}>
+                            {movie.status === "OTT" ? "📺 Available on OTT" : movie.status === "Coming Soon" ? "⏳ Coming Soon" : "🎬 In Theatres"}
+                        </span>
                         <button
                             className={`fav-btn ${isFavorite ? "fav-active" : ""}`}
                             onClick={handleToggleFavorite}
@@ -347,6 +364,40 @@ function Movie() {
                 </div>
             </div>
 
+            {/* ========== OTT Providers Section ========== */}
+            <div className="ott-section">
+                <h3 className="ott-heading">Available on OTT</h3>
+                {ottLoading ? (
+                    <p className="ott-loading">Loading OTT platforms...</p>
+                ) : ottProviders.length > 0 ? (
+                    <div className="ott-providers">
+                        {ottProviders.map((p, idx) => (
+                            <a
+                                key={idx}
+                                href={ottLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ott-provider"
+                                title={p.name}
+                            >
+                                <img src={p.logo} alt={p.name} className="ott-logo" />
+                                <span className="ott-name">{p.name}</span>
+                            </a>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="ott-unavailable">Not available on OTT yet</p>
+                )}
+            </div>
+
+            {/* ========== Showtimes (hidden for OTT movies) ========== */}
+            {movie.status === "OTT" ? (
+                <div className="ott-theatre-notice">
+                    <p>🚫 This movie is no longer running in theatres.</p>
+                    <p>Watch it on your favourite OTT platform above.</p>
+                </div>
+            ) : (
+            <>
             <h3 className="showtimes-heading">Showtimes</h3>
 
             {/* City Filter */}
@@ -436,6 +487,8 @@ function Movie() {
                         </div>
                     )})}
                 </div>
+            )}
+            </>
             )}
 
             {/* ========== Reviews Section ========== */}

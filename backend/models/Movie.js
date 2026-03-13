@@ -13,7 +13,12 @@ const MovieSchema = new mongoose.Schema({
     trailerUrl: { type: String },                        // YouTube trailer link
     cast: { type: [String] },                            // e.g. ["Actor1", "Actor2"]
     director: { type: String },
-    nowShowing: { type: Boolean, default: true }         // is the movie currently in theaters?
+    nowShowing: { type: Boolean, default: true },        // is the movie currently in theaters?
+    status: {
+        type: String,
+        enum: ["In Theatres", "OTT", "Coming Soon"],
+        default: "In Theatres"
+    }
 }, { timestamps: true });
 
 module.exports = mongoose.model("Movie", MovieSchema);

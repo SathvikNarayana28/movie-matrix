@@ -354,6 +354,61 @@ body.dark-mode .showtime-card {
   color: #e0e0e0;
 }
 
+/* Status badge dark mode */
+body.dark-mode .status-in-theatres {
+  background: #1b3a26;
+  color: #66bb6a;
+}
+
+body.dark-mode .status-ott {
+  background: #102840;
+  color: #64b5f6;
+}
+
+body.dark-mode .status-coming-soon {
+  background: #3e2a10;
+  color: #ffb74d;
+}
+
+body.dark-mode .ott-theatre-notice {
+  background: #2a2210;
+  border-color: #5a4a20;
+}
+
+body.dark-mode .ott-theatre-notice p:first-child {
+  color: #ffb74d;
+}
+
+body.dark-mode .ott-theatre-notice p:last-child {
+  color: #aaa;
+}
+
+/* OTT section on movie detail */
+body.dark-mode .ott-section {
+  background: #1e1e1e;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+body.dark-mode .ott-heading {
+  color: #e0e0e0;
+}
+
+body.dark-mode .ott-provider {
+  background: #2a2a2a;
+}
+
+body.dark-mode .ott-provider:hover {
+  background: #333;
+}
+
+body.dark-mode .ott-name {
+  color: #ccc;
+}
+
+body.dark-mode .ott-unavailable {
+  color: #888;
+}
+
 /* Reviews section on movie detail */
 body.dark-mode .reviews-section {
   border-top-color: #333;
