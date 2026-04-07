@@ -1,7 +1,11 @@
 const Movie = require("../models/Movie");
 const Showtime = require("../models/Showtime");
+const { buildShowDateTime } = require("../utils/dateTime");
 const { buildUserProfile, getTimeSlot } = require("./profileBuilder");
 const { fetchTrending, discoverMoviesByGenre } = require("./tmdbService");
+
+const RECOMMENDATION_CACHE_TTL_MS = 90 * 1000;
+const recommendationCache = new Map();
 
 /**
  * Generate personalized movie recommendations for a user.
@@ -14,11 +18,25 @@ const { fetchTrending, discoverMoviesByGenre } = require("./tmdbService");
  * Returns top N movies with scores, reasons, and suggested showtimes.
  */
 async function getRecommendations(userId, limit = 5) {
+    const cacheKey = `${userId}:${limit}`;
+    const cached = recommendationCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+        return JSON.parse(JSON.stringify(cached.data));
+    }
+
     // 1. Build user profile from history
     const profile = await buildUserProfile(userId);
+    const watchedMovieIdSet = new Set(profile.watchedMovieIds);
 
     // 2. Get all currently showing movies
-    const movies = await Movie.find({ nowShowing: true }).lean();
+    const movies = await Movie.find({
+        $or: [
+            { status: "In Theatres" },
+            { nowShowing: true }
+        ]
+    })
+        .select("title genre language rating posterUrl duration cast director")
+        .lean();
 
     if (movies.length === 0) {
         return { recommendations: [], profile };
@@ -33,12 +51,19 @@ async function getRecommendations(userId, limit = 5) {
         dates.push(d.toISOString().split("T")[0]);
     }
 
-    const showtimes = await Showtime.find({
+    const rawShowtimes = await Showtime.find({
         date: { $in: dates },
         movie: { $in: movies.map(m => m._id) }
     })
+        .select("movie theater date time price seats")
         .populate("theater", "name area city _id")
         .lean();
+
+    const now = new Date();
+    const showtimes = rawShowtimes.filter((st) => {
+        const showDateTime = buildShowDateTime(st.date, st.time);
+        return showDateTime && showDateTime > now;
+    });
 
     // Group showtimes by movieId
     const showtimesByMovie = {};
@@ -51,11 +76,16 @@ async function getRecommendations(userId, limit = 5) {
     // 4. Score each movie
     const scored = [];
 
+    const topGenres = Object.entries(profile.genreWeights)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 2)
+        .map(e => e[0]);
+
     for (const movie of movies) {
         const mid = movie._id.toString();
 
         // Skip already-watched movies
-        if (profile.watchedMovieIds.includes(mid)) continue;
+        if (watchedMovieIdSet.has(mid)) continue;
 
         const movieShowtimes = showtimesByMovie[mid] || [];
 
@@ -129,10 +159,6 @@ async function getRecommendations(userId, limit = 5) {
 
         // --- Diversity Bonus (0.05) ---
         // Boost if genre is NOT in user's top-2 genres (breaks filter bubble)
-        const topGenres = Object.entries(profile.genreWeights)
-            .sort((a, b) => b[1] - a[1])
-            .slice(0, 2)
-            .map(e => e[0]);
         const isDiverse = Array.isArray(movie.genre) && !movie.genre.some(g => topGenres.includes(g));
         const diversityBonus = isDiverse ? 1.0 : 0.0;
 
@@ -257,7 +283,7 @@ async function getRecommendations(userId, limit = 5) {
         }
     }
 
-    return {
+    const result = {
         recommendations: finalRecs,
         profile: {
             topGenres: Object.entries(profile.genreWeights)
@@ -269,6 +295,30 @@ async function getRecommendations(userId, limit = 5) {
             totalBookings: profile.totalBookings
         }
     };
+
+    recommendationCache.set(cacheKey, {
+        expiresAt: Date.now() + RECOMMENDATION_CACHE_TTL_MS,
+        data: result
+    });
+
+    return JSON.parse(JSON.stringify(result));
 }
 
-module.exports = { getRecommendations };
+function invalidateRecommendationCache(userId) {
+    const prefix = `${userId}:`;
+    for (const key of recommendationCache.keys()) {
+        if (key.startsWith(prefix)) {
+            recommendationCache.delete(key);
+        }
+    }
+}
+
+function invalidateAllRecommendationCache() {
+    recommendationCache.clear();
+}
+
+module.exports = {
+    getRecommendations,
+    invalidateRecommendationCache,
+    invalidateAllRecommendationCache
+};

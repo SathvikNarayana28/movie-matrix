@@ -11,4 +11,6 @@ const TheaterSchema = new mongoose.Schema({
     lng: { type: Number }                                  // longitude
 }, { timestamps: true });
 
+TheaterSchema.index({ city: 1, area: 1 });
+
 module.exports = mongoose.model("Theater", TheaterSchema);

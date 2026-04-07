@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const authMiddleware = require("../middleware/authMiddleware");
 const {
+    createReviewFromBookings,
     createReview,
     getMovieReviews,
     getAverageRating,
@@ -22,6 +23,7 @@ router.get("/feed", authMiddleware, getReviewsFeed);
 router.get("/all", authMiddleware, getAllReviews);
 router.get("/top-reviewers", getTopReviewers);
 router.get("/user/:userId", getUserReviews);
+router.post("/", authMiddleware, createReviewFromBookings);
 
 // Public routes
 router.get("/:movieId", getMovieReviews);

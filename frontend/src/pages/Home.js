@@ -409,7 +409,7 @@ function Home() {
                 <p className="no-movies">
                     {searchTerm
                         ? "No movies match your search."
-                        : "No movies available right now."}
+                        : "No movies currently running in theatres."}
                 </p>
             )}
 

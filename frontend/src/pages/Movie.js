@@ -242,23 +242,65 @@ function Movie() {
     if (loading) return <p className="loading-text">Loading...</p>;
     if (!movie) return <p className="error-text">Movie not found.</p>;
 
+    const buildShowDateTime = (date, time) => {
+        if (!date || !time) return null;
+
+        const datePart = String(date).split("T")[0];
+        const dateMatch = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!dateMatch) return null;
+
+        const timePart = String(time).trim();
+        const meridiemMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        const hour24Match = timePart.match(/^(\d{1,2}):(\d{2})$/);
+
+        let hours;
+        let minutes;
+
+        if (meridiemMatch) {
+            hours = parseInt(meridiemMatch[1], 10);
+            minutes = parseInt(meridiemMatch[2], 10);
+            const meridiem = meridiemMatch[3].toUpperCase();
+
+            if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null;
+
+            if (meridiem === "PM" && hours !== 12) hours += 12;
+            if (meridiem === "AM" && hours === 12) hours = 0;
+        } else if (hour24Match) {
+            hours = parseInt(hour24Match[1], 10);
+            minutes = parseInt(hour24Match[2], 10);
+
+            if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+        } else {
+            return null;
+        }
+
+        const [, year, month, day] = dateMatch;
+        return new Date(Number(year), Number(month) - 1, Number(day), hours, minutes, 0, 0);
+    };
+
+    const now = new Date();
+    const validFutureShowtimes = showtimes.filter((st) => {
+        const showDateTime = buildShowDateTime(st.date, st.time);
+        return showDateTime && showDateTime > now;
+    });
+
     // Get unique cities from all showtimes for the city filter
     const cities = [...new Set(
-        showtimes
+        validFutureShowtimes
             .filter(st => st.theater && st.theater.city)
             .map(st => st.theater.city)
     )];
 
     // Filter showtimes by selected city
     const cityFiltered = selectedCity
-        ? showtimes.filter(st => st.theater && st.theater.city === selectedCity)
-        : showtimes;
+        ? validFutureShowtimes.filter(st => st.theater && st.theater.city === selectedCity)
+        : validFutureShowtimes;
 
-    // Extract unique dates from city-filtered showtimes, filter out past dates, sorted ascending
+    // Extract unique dates from valid city-filtered showtimes, sorted ascending
     const today = new Date().toISOString().split("T")[0];
     const availableDates = [...new Set(
         cityFiltered.map(st => st.date ? st.date.split("T")[0] : "")
-    )].filter(d => d && d >= today).sort();
+    )].filter(d => d).sort();
 
     // Auto-select today if available, otherwise first future date
     const activeDateRaw = selectedDate && availableDates.includes(selectedDate)

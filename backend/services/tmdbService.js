@@ -10,6 +10,23 @@ const axios = require("axios");
 const TMDB_BASE = "https://api.themoviedb.org/3";
 const TMDB_KEY = process.env.TMDB_API_KEY;
 const TMDB_IMG = "https://image.tmdb.org/t/p/w500"; // poster base URL
+const tmdbClient = axios.create({ timeout: 8000 });
+const tmdbCache = new Map();
+
+function getCached(key) {
+    const entry = tmdbCache.get(key);
+    if (entry && entry.expiresAt > Date.now()) return entry.value;
+    if (entry) tmdbCache.delete(key);
+    return null;
+}
+
+function setCached(key, value, ttlMs) {
+    tmdbCache.set(key, {
+        value,
+        expiresAt: Date.now() + ttlMs
+    });
+    return value;
+}
 
 // TMDB genre IDs → readable names (subset of the official list)
 const GENRE_MAP = {
@@ -51,8 +68,11 @@ const LANGUAGE_MAP = {
  * Returns an array of objects shaped to match our Movie schema.
  */
 async function fetchNowPlaying() {
+    const cached = getCached("now_playing");
+    if (cached) return cached;
+
     const url = `${TMDB_BASE}/movie/now_playing?api_key=${TMDB_KEY}&language=en-US&page=1`;
-    const res = await axios.get(url);
+    const res = await tmdbClient.get(url);
     const results = res.data.results || [];
 
     // Map each TMDB movie to our local schema shape
@@ -72,7 +92,7 @@ async function fetchNowPlaying() {
         nowShowing: true
     }));
 
-    return movies;
+    return setCached("now_playing", movies, 10 * 60 * 1000);
 }
 
 /**
@@ -80,8 +100,12 @@ async function fetchNowPlaying() {
  * Used to fill in duration, cast, and director after initial import.
  */
 async function fetchMovieDetails(tmdbId) {
+    const cacheKey = `details:${tmdbId}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     const url = `${TMDB_BASE}/movie/${tmdbId}?api_key=${TMDB_KEY}&language=en-US&append_to_response=credits,videos`;
-    const res = await axios.get(url);
+    const res = await tmdbClient.get(url);
     const d = res.data;
 
     // Extract runtime
@@ -106,7 +130,7 @@ async function fetchMovieDetails(tmdbId) {
     // Genres from detail endpoint (more reliable than genre_ids)
     const genre = (d.genres || []).map(g => g.name);
 
-    return { duration, cast, director, trailerUrl, genre };
+    return setCached(cacheKey, { duration, cast, director, trailerUrl, genre }, 30 * 60 * 1000);
 }
 
 /**
@@ -114,8 +138,13 @@ async function fetchMovieDetails(tmdbId) {
  * Returns an array of objects shaped to match our Movie schema.
  */
 async function searchMovies(query) {
+    const normalizedQuery = String(query || "").trim().toLowerCase();
+    const cacheKey = `search:${normalizedQuery}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     const url = `${TMDB_BASE}/search/movie?api_key=${TMDB_KEY}&language=en-US&query=${encodeURIComponent(query)}&page=1`;
-    const res = await axios.get(url);
+    const res = await tmdbClient.get(url);
     const results = res.data.results || [];
 
     // Map each result to our local schema shape (same as fetchNowPlaying)
@@ -138,7 +167,7 @@ async function searchMovies(query) {
             nowShowing: false
         }));
 
-    return movies;
+    return setCached(cacheKey, movies, 5 * 60 * 1000);
 }
 
 module.exports = { fetchNowPlaying, fetchMovieDetails, searchMovies, fetchTrending, fetchWatchProviders, discoverMoviesByGenre };
@@ -148,11 +177,14 @@ module.exports = { fetchNowPlaying, fetchMovieDetails, searchMovies, fetchTrendi
  * Returns top 15 trending movies globally.
  */
 async function fetchTrending() {
+    const cached = getCached("trending_week");
+    if (cached) return cached;
+
     const url = `${TMDB_BASE}/trending/movie/week?api_key=${TMDB_KEY}&language=en-US`;
-    const res = await axios.get(url);
+    const res = await tmdbClient.get(url);
     const results = (res.data.results || []).slice(0, 15);
 
-    return results
+    return setCached("trending_week", results
         .filter(m => m.title && m.poster_path)
         .map(m => ({
             tmdbId: String(m.id),
@@ -163,7 +195,7 @@ async function fetchTrending() {
             rating: m.vote_average || 0,
             description: m.overview || "",
             posterUrl: `${TMDB_IMG}${m.poster_path}`
-        }));
+        })), 10 * 60 * 1000);
 }
 
 /**
@@ -171,11 +203,15 @@ async function fetchTrending() {
  * genreId: TMDB genre ID (e.g., 28 for Action)
  */
 async function discoverMoviesByGenre(genreId) {
+    const cacheKey = `discover:${genreId}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     const url = `${TMDB_BASE}/discover/movie?api_key=${TMDB_KEY}&language=en-US&sort_by=popularity.desc&with_genres=${genreId}&page=1`;
-    const res = await axios.get(url);
+    const res = await tmdbClient.get(url);
     const results = (res.data.results || []).slice(0, 10);
 
-    return results
+    return setCached(cacheKey, results
         .filter(m => m.title && m.poster_path)
         .map(m => ({
             tmdbId: String(m.id),
@@ -186,7 +222,7 @@ async function discoverMoviesByGenre(genreId) {
             rating: m.vote_average || 0,
             description: m.overview || "",
             posterUrl: `${TMDB_IMG}${m.poster_path}`
-        }));
+        })), 10 * 60 * 1000);
 }
 
 /**
@@ -194,8 +230,12 @@ async function discoverMoviesByGenre(genreId) {
  * Returns providers for India (IN) region by default.
  */
 async function fetchWatchProviders(tmdbId, region = "IN") {
+    const cacheKey = `providers:${tmdbId}:${region}`;
+    const cached = getCached(cacheKey);
+    if (cached) return cached;
+
     const url = `${TMDB_BASE}/movie/${tmdbId}/watch/providers?api_key=${TMDB_KEY}`;
-    const res = await axios.get(url);
+    const res = await tmdbClient.get(url);
     const regionData = res.data.results?.[region] || res.data.results?.["US"] || {};
 
     const providers = [];
@@ -223,5 +263,5 @@ async function fetchWatchProviders(tmdbId, region = "IN") {
         }
     }
 
-    return providers;
+    return setCached(cacheKey, providers, 30 * 60 * 1000);
 }

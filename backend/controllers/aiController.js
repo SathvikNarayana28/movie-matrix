@@ -3,12 +3,71 @@ const Movie = require("../models/Movie");
 const Showtime = require("../models/Showtime");
 const Booking = require("../models/Booking");
 const User = require("../models/User");
+const { buildShowDateTime } = require("../utils/dateTime");
 const { buildUserProfile } = require("../services/profileBuilder");
 const { getRecommendations } = require("../services/recommendationEngine");
 const { searchMovies, fetchTrending, fetchWatchProviders, fetchMovieDetails } = require("../services/tmdbService");
 
 // Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const aiCache = {
+    movieContext: new Map(),
+    tmdbTrending: new Map(),
+    tmdbSearch: new Map(),
+    tmdbDetails: new Map(),
+    tmdbProviders: new Map()
+};
+
+const CACHE_TTL = {
+    movieContext: 60 * 1000,
+    tmdbTrending: 10 * 60 * 1000,
+    tmdbSearch: 3 * 60 * 1000,
+    tmdbDetails: 30 * 60 * 1000,
+    tmdbProviders: 30 * 60 * 1000
+};
+
+function buildFallbackAiResponse(intent, userName) {
+    if (intent === "booking") {
+        return {
+            message: `${userName}, I couldn't load the AI reply right now, but you can still check your bookings and ticket details from My Bookings.`,
+            recommendations: [],
+            actions: [{ label: "Open My Bookings", route: "/my-bookings", type: "navigate" }],
+            quickReplies: ["Show my latest booking", "How do I cancel a booking?"]
+        };
+    }
+
+    if (intent === "movie") {
+        return {
+            message: `${userName}, AI is temporarily slow, but you can still browse movies currently playing and book from the Home page.`,
+            recommendations: [],
+            actions: [{ label: "Browse Movies", route: "/", type: "navigate" }],
+            quickReplies: ["Recommend an action movie", "What is playing tonight?"]
+        };
+    }
+
+    return {
+        message: `${userName}, AI is temporarily unavailable. You can still browse movies, bookings, and favorites normally in Movie Matrix.`,
+        recommendations: [],
+        actions: [],
+        quickReplies: ["What can you do?", "Show movies playing now"]
+    };
+}
+
+async function cachedGet(store, key, ttlMs, loader) {
+    const cached = store.get(key);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.value;
+    }
+
+    const value = await loader();
+    store.set(key, { value, expiresAt: Date.now() + ttlMs });
+    return value;
+}
+
+function invalidateAiContextCache() {
+    aiCache.movieContext.clear();
+}
 
 /**
  * Classify user intent to decide what context to fetch.
@@ -119,11 +178,11 @@ exports.chat = async (req, res) => {
             return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         };
 
-        // 1. Build user profile (always — it's lightweight)
-        const profile = await buildUserProfile(req.user.id);
-
-        // 2. Fetch user details
-        const currentUser = await User.findById(req.user.id).select("name email role favorites").lean();
+        // 1. Build profile + fetch user details in parallel
+        const [profile, currentUser] = await Promise.all([
+            buildUserProfile(req.user.id),
+            User.findById(req.user.id).select("name email role favorites").lean()
+        ]);
         const userName = currentUser?.name || "User";
 
         // 3. Fetch booking info if booking-related or general (for context)
@@ -168,41 +227,71 @@ exports.chat = async (req, res) => {
         let movieCatalog = "";
         let movies = [];
         let showtimes = [];
+        const localTitles = new Set();
 
         if (intent === "movie" || intent === "general") {
-            const today = new Date();
-            const dates = [];
-            for (let i = 0; i < 3; i++) {
-                const d = new Date(today);
-                d.setDate(today.getDate() + i);
-                dates.push(d.toISOString().split("T")[0]);
+            const movieContext = await cachedGet(aiCache.movieContext, "current_context", CACHE_TTL.movieContext, async () => {
+                const today = new Date();
+                const dates = [];
+                for (let i = 0; i < 3; i++) {
+                    const d = new Date(today);
+                    d.setDate(today.getDate() + i);
+                    dates.push(d.toISOString().split("T")[0]);
+                }
+
+                const contextMovies = await Movie.find({
+                    $or: [
+                        { status: "In Theatres" },
+                        { nowShowing: true }
+                    ]
+                })
+                    .select("title genre language rating cast director posterUrl")
+                    .lean();
+
+                const rawShowtimes = await Showtime.find({
+                    date: { $in: dates },
+                    movie: { $in: contextMovies.map(m => m._id) }
+                })
+                    .select("movie theater date time seats price")
+                    .populate("theater", "name area city lat lng")
+                    .lean();
+
+                const now = new Date();
+                const contextShowtimes = rawShowtimes.filter((st) => {
+                    const showDateTime = buildShowDateTime(st.date, st.time);
+                    return showDateTime && showDateTime > now;
+                });
+
+                return { movies: contextMovies, showtimes: contextShowtimes };
+            });
+
+            movies = movieContext.movies;
+            showtimes = movieContext.showtimes;
+
+            const showtimesByMovie = new Map();
+            for (const st of showtimes) {
+                const movieId = st.movie?.toString();
+                if (!movieId) continue;
+                if (!showtimesByMovie.has(movieId)) showtimesByMovie.set(movieId, []);
+                showtimesByMovie.get(movieId).push(st);
             }
 
-            movies = await Movie.find({ nowShowing: true }).lean();
-            showtimes = await Showtime.find({
-                date: { $in: dates },
-                movie: { $in: movies.map(m => m._id) }
-            })
-                .populate("theater", "name area city lat lng")
-                .lean();
+            for (const movie of movies) {
+                localTitles.add(movie.title.toLowerCase());
+            }
 
-            // Build movie catalog string for the prompt
             movieCatalog = movies.map(m => {
-                const movieShowtimes = showtimes.filter(st => st.movie.toString() === m._id.toString());
+                const movieShowtimes = showtimesByMovie.get(m._id.toString()) || [];
 
                 const seenTheatres = new Set();
-                const uniqueTheatreShowtimes = [];
-                const remainingShowtimes = [];
+                const selectedShowtimes = [];
                 for (const st of movieShowtimes) {
                     const theaterId = st.theater?._id?.toString();
-                    if (theaterId && !seenTheatres.has(theaterId)) {
-                        seenTheatres.add(theaterId);
-                        uniqueTheatreShowtimes.push(st);
-                    } else {
-                        remainingShowtimes.push(st);
-                    }
+                    if (!theaterId || seenTheatres.has(theaterId)) continue;
+                    seenTheatres.add(theaterId);
+                    selectedShowtimes.push(st);
+                    if (selectedShowtimes.length >= 3) break;
                 }
-                const selectedShowtimes = [...uniqueTheatreShowtimes, ...remainingShowtimes];
 
                 const showtimeInfo = selectedShowtimes.map(st => {
                     const available = st.seats ? st.seats.filter(s => !s.isBooked).length : 0;
@@ -238,15 +327,16 @@ Preferences (from booking history):
 
         if (intent === "movie") {
             try {
-                const trending = await fetchTrending();
-                const localTitles = new Set(movies.map(m => m.title.toLowerCase()));
+                const trending = await cachedGet(aiCache.tmdbTrending, "weekly_trending", CACHE_TTL.tmdbTrending, () => fetchTrending());
                 const tmdbOnly = trending.filter(t => !localTitles.has(t.title.toLowerCase()));
 
                 const tmdbWithOTT = await Promise.all(
                     tmdbOnly.slice(0, 10).map(async (m) => {
                         try {
-                            const providers = await fetchWatchProviders(m.tmdbId);
-                            const details = await fetchMovieDetails(m.tmdbId);
+                            const [providers, details] = await Promise.all([
+                                cachedGet(aiCache.tmdbProviders, `providers:${m.tmdbId}`, CACHE_TTL.tmdbProviders, () => fetchWatchProviders(m.tmdbId)),
+                                cachedGet(aiCache.tmdbDetails, `details:${m.tmdbId}`, CACHE_TTL.tmdbDetails, () => fetchMovieDetails(m.tmdbId))
+                            ]);
                             return { ...m, cast: details.cast || [], director: details.director || "", duration: details.duration || 0, trailerUrl: details.trailerUrl || "", ott: providers };
                         } catch { return { ...m, ott: [] }; }
                     })
@@ -271,17 +361,25 @@ Preferences (from booking history):
                     userMsg.includes("old movie") || userMsg.includes("recommend me");
 
                 if (isMovieQuery || !movieCatalog.includes(message.split(" ").filter(w => w.length > 3)[0] || "")) {
-                    const searchResults = await searchMovies(message.replace(/where can i watch|ott|streaming|available on|watch online/gi, "").trim());
+                    const searchQuery = message.replace(/where can i watch|ott|streaming|available on|watch online/gi, "").trim();
+                    const searchResults = await cachedGet(
+                        aiCache.tmdbSearch,
+                        `search:${searchQuery.toLowerCase()}`,
+                        CACHE_TTL.tmdbSearch,
+                        () => searchMovies(searchQuery)
+                    );
                     const filteredSearch = searchResults
-                        .filter(m => !new Set(movies.map(mv => mv.title.toLowerCase())).has(m.title.toLowerCase()))
+                        .filter(m => !localTitles.has(m.title.toLowerCase()))
                         .slice(0, 5);
 
                     if (filteredSearch.length > 0) {
                         const searchWithOTT = await Promise.all(
                             filteredSearch.map(async (m) => {
                                 try {
-                                    const providers = await fetchWatchProviders(m.tmdbId);
-                                    const details = await fetchMovieDetails(m.tmdbId);
+                                    const [providers, details] = await Promise.all([
+                                        cachedGet(aiCache.tmdbProviders, `providers:${m.tmdbId}`, CACHE_TTL.tmdbProviders, () => fetchWatchProviders(m.tmdbId)),
+                                        cachedGet(aiCache.tmdbDetails, `details:${m.tmdbId}`, CACHE_TTL.tmdbDetails, () => fetchMovieDetails(m.tmdbId))
+                                    ]);
                                     return { ...m, cast: details.cast || [], director: details.director || "", ott: providers };
                                 } catch { return { ...m, ott: [] }; }
                             })
@@ -298,23 +396,15 @@ Preferences (from booking history):
         }
 
         // 6. Build system prompt based on intent
-        const systemPrompt = `You are Movie Matrix AI — a smart, friendly, and versatile assistant for the Movie Matrix theatre booking platform based in Hyderabad, India. You are NOT just a movie bot — you are a full-featured assistant who can help with ANYTHING.
+        const systemPrompt = `You are Movie Matrix AI, the in-app assistant for Movie Matrix in Hyderabad.
 
-YOUR CAPABILITIES:
-1. **Movie Recommendations** — Suggest movies based on mood, genre, language, actors, etc. from currently playing + TMDB data.
-2. **Booking Help** — Answer questions about user's bookings, how to book, cancel, view tickets.
-3. **App Navigation** — Guide users to different pages and features of the Movie Matrix app.
-4. **General Knowledge** — Answer ANY general question (science, history, math, trivia, coding, etc.) like a knowledgeable assistant.
-5. **Entertainment & Fun** — Movie trivia, actor info, film history, fun facts, jokes, etc.
-6. **Troubleshooting** — Help users with common issues on the platform.
+    GOALS:
+    - Be accurate, concise, and helpful.
+    - Prefer exact app data over guesses.
+    - Keep most answers under 120 words unless the question needs more detail.
+    - Use simple language and avoid filler.
 
-PERSONALITY:
-- Warm, helpful, and conversational
-- Use the user's name (${userName}) occasionally to feel personal
-- Be concise but thorough — 2-5 sentences for most replies, longer for complex questions
-- Use emojis sparingly to add warmth
-
-APP NAVIGATION GUIDE (for helping users navigate Movie Matrix):
+    APP NAVIGATION GUIDE:
 - Home page (/) — Browse all now-showing movies, filter by genre/language, search
 - Movie details (/movie/:id) — View full details, cast, trailer, showtimes for a specific movie
 - Book tickets (/book/:showtimeId) — Select seats and book tickets for a specific showtime
@@ -325,7 +415,7 @@ APP NAVIGATION GUIDE (for helping users navigate Movie Matrix):
 - Login (/login) — Sign in to your account
 - Register (/register) — Create a new account
 
-APP FEATURES KNOWLEDGE:
+    APP FEATURES:
 - Users can search movies by title on the home page search bar
 - Movies can be filtered by genre and language on the home page
 - Users can add movies to favorites by clicking the heart icon on movie cards
@@ -338,16 +428,14 @@ APP FEATURES KNOWLEDGE:
 - The AI chatbot (that's you!) is accessible via the floating 🤖 button
 
 ${intent === "movie" || intent === "general" ? `
-MOVIE RECOMMENDATION RULES:
+MOVIE RESPONSE RULES:
 1. For theatre bookings, ONLY recommend movies from the "CURRENTLY PLAYING" catalog. NEVER invent movies.
 2. Base recommendations on the user's message + preference profile.
-3. If suggesting a currently playing movie, mention a specific showtime (theatre, date, time, price).
-4. CRITICAL: For showtimeId, use the EXACT ShowtimeID value from the catalog (24-char hex). NEVER make up IDs.
-5. Show options from MULTIPLE DIFFERENT theatres (2-3 if available).
-6. When distance info [X.X km away] is shown, PRIORITIZE nearer theatres.
-7. For OTT/streaming queries, provide platform info from TMDB data.
-8. For non-playing movies, do NOT include showtimeId or movieId — use tmdbId and OTT info.
-9. If the user's request is vague, use their profile to personalize.
+3. If suggesting a currently playing movie, mention one specific showtime.
+4. Use the EXACT ShowtimeID and MovieID values from the catalog. Never invent IDs.
+5. For OTT queries, use TMDB platform info if available.
+6. For non-playing movies, do not include showtimeId or movieId.
+7. If the request is vague, personalize using the profile.
 
 CURRENTLY PLAYING IN THEATRES (bookable):
 ${movieCatalog || "No movies currently showing."}
@@ -360,14 +448,14 @@ ${bookingsSummary ? `USER'S RECENT BOOKINGS:\n${bookingsSummary}` : ""}
 
 ${profileSummary}
 
-RESPONSE FORMAT — You MUST respond with valid JSON only, no markdown:
+RESPONSE FORMAT — return valid JSON only, no markdown:
 {
-  "message": "Your conversational response here. For general knowledge, app help, or casual chat, just put your full answer here.",
+    "message": "Main answer here.",
   "recommendations": [
     {
-      "movieId": "exact MongoDB _id from CURRENTLY PLAYING catalog (24-char hex) — ONLY for playing movies, omit for OTT",
+            "movieId": "exact MongoDB _id from CURRENTLY PLAYING catalog, omit for OTT",
       "title": "Movie Title",
-      "showtimeId": "exact ShowtimeID from catalog (24-char hex) — ONLY for playing movies, omit for OTT",
+            "showtimeId": "exact ShowtimeID from catalog, omit for OTT",
       "theater": "Theater Name or OTT platform",
       "time": "Show time (for playing movies) or omit for OTT",
       "date": "Show date (for playing movies) or omit for OTT",
@@ -387,17 +475,13 @@ RESPONSE FORMAT — You MUST respond with valid JSON only, no markdown:
   "quickReplies": ["Suggested follow-up 1", "Suggested follow-up 2"]
 }
 
-IMPORTANT RULES FOR RESPONSE:
-- "recommendations" should be an EMPTY array [] if no movie suggestions are relevant (e.g., for general chat, app help, knowledge questions).
-- "actions" array is for suggesting navigation buttons. Include when guiding users to a page. Can be empty [].
-  - type can be: "navigate" (go to a page), "link" (external URL)
-  - For "navigate", route should be a valid app route like "/my-bookings", "/favorites", "/profile", etc.
-- "quickReplies" are suggested follow-up messages the user might want to ask. Include 2-4 relevant ones. Can be empty [].
-- Set "isOTT": true for streaming-only movies, false for currently playing.
-- For general knowledge, trivia, math, science, coding, etc. — answer fully in the "message" field.
-- If the user greets you, greet them back by name and suggest what you can help with.
-- If the user asks what you can do, explain ALL your capabilities (not just movies).
-- ALWAYS return valid JSON. Never include markdown backticks around the JSON.`;
+RULES:
+- recommendations must be [] when not relevant.
+- actions can be [] when not needed.
+- quickReplies should have 2 to 4 short follow-ups when possible.
+- Set isOTT true only for streaming-only results.
+- Answer general/app-help questions directly in message.
+- Always return valid JSON without markdown fences.`;
 
         // Try models in order — fallback if rate-limited
         const modelsToTry = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
@@ -461,7 +545,9 @@ IMPORTANT RULES FOR RESPONSE:
             // Fallback: return just the text
             parsed = {
                 message: responseText.substring(0, 500),
-                recommendations: []
+                recommendations: [],
+                actions: [],
+                quickReplies: []
             };
         }
 
@@ -532,6 +618,10 @@ IMPORTANT RULES FOR RESPONSE:
             parsed.recommendations = validRecs;
         }
 
+        if (!parsed.message || typeof parsed.message !== "string") {
+            parsed.message = buildFallbackAiResponse(intent, userName).message;
+        }
+
         res.json(parsed);
 
     } catch (err) {
@@ -542,6 +632,8 @@ IMPORTANT RULES FOR RESPONSE:
         if (err.message?.includes("429") || err.message?.includes("quota")) {
             return res.status(429).json({ msg: "AI quota limit reached. Please wait a minute and try again, or generate a new API key at aistudio.google.com/apikey" });
         }
-        res.status(500).json({ msg: "AI assistant is temporarily unavailable. Please try again." });
+        res.status(200).json(buildFallbackAiResponse(classifyIntent(req.body?.message || ""), "User"));
     }
 };
+
+exports.invalidateAiContextCache = invalidateAiContextCache;

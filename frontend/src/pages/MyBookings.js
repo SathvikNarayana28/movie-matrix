@@ -9,7 +9,26 @@ function MyBookings() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [cancellingId, setCancellingId] = useState(null);
+    const [reviewedMovieIds, setReviewedMovieIds] = useState([]);
+    const [activeReviewBookingId, setActiveReviewBookingId] = useState(null);
+    const [reviewRating, setReviewRating] = useState(0);
+    const [reviewComment, setReviewComment] = useState("");
+    const [reviewSubmittingBookingId, setReviewSubmittingBookingId] = useState(null);
+    const [reviewError, setReviewError] = useState("");
     const navigate = useNavigate();
+
+    const getUserId = () => {
+        const stored = localStorage.getItem("userId");
+        if (stored) return stored;
+        try {
+            const token = localStorage.getItem("token");
+            if (!token) return null;
+            const payload = JSON.parse(atob(token.split(".")[1]));
+            return payload.id || null;
+        } catch {
+            return null;
+        }
+    };
 
     useEffect(() => {
         const token = localStorage.getItem("token");
@@ -20,8 +39,25 @@ function MyBookings() {
 
         const fetchBookings = async () => {
             try {
-                const res = await API.get("/bookings/my");
-                setBookings(res.data);
+                const userId = getUserId();
+                const bookingsRes = await API.get("/bookings/my");
+                let reviewsRes = { data: [] };
+
+                if (userId && /^[a-f\d]{24}$/i.test(userId)) {
+                    try {
+                        reviewsRes = await API.get(`/reviews/user/${userId}`);
+                    } catch (reviewErr) {
+                        console.error("Failed to fetch user reviews:", reviewErr);
+                    }
+                }
+
+                setBookings(bookingsRes.data);
+
+                const reviewedIds = reviewsRes.data
+                    .map((review) => review.movie?._id || review.movie)
+                    .filter(Boolean)
+                    .map((id) => id.toString());
+                setReviewedMovieIds([...new Set(reviewedIds)]);
             } catch (err) {
                 console.error(err);
                 setError("Failed to load bookings");
@@ -141,12 +177,99 @@ function MyBookings() {
         doc.save(`ticket_${bookingId}.pdf`);
     };
 
-    // Check if a show has already started (cannot cancel past shows)
-    const isShowStarted = (b) => {
-        if (!b.showtime?.date || !b.showtime?.time) return true;
-        const showDateStr = new Date(b.showtime.date).toISOString().split("T")[0];
-        const showStart = new Date(`${showDateStr}T${b.showtime.time}`);
-        return new Date() >= showStart;
+    const buildShowDateTime = (date, time) => {
+        if (!date || !time) return null;
+
+        const datePart = String(date).split("T")[0];
+        const dateMatch = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!dateMatch) return null;
+
+        const timePart = String(time).trim();
+        const meridiemMatch = timePart.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        const hour24Match = timePart.match(/^(\d{1,2}):(\d{2})$/);
+
+        let hours;
+        let minutes;
+
+        if (meridiemMatch) {
+            hours = parseInt(meridiemMatch[1], 10);
+            minutes = parseInt(meridiemMatch[2], 10);
+            const meridiem = meridiemMatch[3].toUpperCase();
+
+            if (hours < 1 || hours > 12 || minutes < 0 || minutes > 59) return null;
+
+            if (meridiem === "PM" && hours !== 12) hours += 12;
+            if (meridiem === "AM" && hours === 12) hours = 0;
+        } else if (hour24Match) {
+            hours = parseInt(hour24Match[1], 10);
+            minutes = parseInt(hour24Match[2], 10);
+
+            if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
+        } else {
+            return null;
+        }
+
+        const [, year, month, day] = dateMatch;
+        return new Date(Number(year), Number(month) - 1, Number(day), hours, minutes, 0, 0);
+    };
+
+    const isShowStarted = (booking) => {
+        const showDateTime = buildShowDateTime(booking.showtime?.date, booking.showtime?.time);
+        if (!showDateTime) return true;
+        return new Date() >= showDateTime;
+    };
+
+    const getMovieIdFromBooking = (booking) => booking.showtime?.movie?._id?.toString() || "";
+
+    const openReviewForm = (bookingId) => {
+        setActiveReviewBookingId(bookingId);
+        setReviewRating(0);
+        setReviewComment("");
+        setReviewError("");
+    };
+
+    const closeReviewForm = () => {
+        setActiveReviewBookingId(null);
+        setReviewRating(0);
+        setReviewComment("");
+        setReviewError("");
+    };
+
+    const handleSubmitReview = async (booking) => {
+        const movieId = getMovieIdFromBooking(booking);
+        if (!movieId) {
+            setReviewError("Movie details are missing for this booking.");
+            return;
+        }
+        if (reviewRating < 1 || reviewRating > 5) {
+            setReviewError("Please select a rating between 1 and 5 stars.");
+            return;
+        }
+        if (!reviewComment.trim()) {
+            setReviewError("Please enter a review comment.");
+            return;
+        }
+
+        try {
+            setReviewSubmittingBookingId(booking._id);
+            setReviewError("");
+
+            await API.post("/reviews", {
+                movieId,
+                rating: reviewRating,
+                comment: reviewComment.trim()
+            });
+
+            setReviewedMovieIds((prev) =>
+                prev.includes(movieId) ? prev : [...prev, movieId]
+            );
+            closeReviewForm();
+        } catch (err) {
+            console.error("Review submit error:", err);
+            setReviewError(err.response?.data?.error || "Failed to submit review.");
+        } finally {
+            setReviewSubmittingBookingId(null);
+        }
     };
 
     if (loading) return <p className="loading-text">Loading your bookings...</p>;
@@ -159,7 +282,12 @@ function MyBookings() {
                 <p className="no-bookings">You haven't booked any tickets yet.</p>
             ) : (
                 <div className="booking-list">
-                    {bookings.map((b) => (
+                    {bookings.map((b) => {
+                        const movieId = getMovieIdFromBooking(b);
+                        const reviewSubmitted = reviewedMovieIds.includes(movieId);
+                        const hasShowtimeData = !!(b.showtime?.date && b.showtime?.time && movieId);
+                        const canReview = b.status === "confirmed" && hasShowtimeData && isShowStarted(b);
+                        return (
                         <div
                             key={b._id}
                             className={`ticket-card ${b.status === "cancelled" ? "ticket-cancelled" : ""}`}
@@ -210,6 +338,63 @@ function MyBookings() {
                                     </div>
                                 </div>
                                 <p className="ticket-id">Booking ID: {b._id}</p>
+
+                                {canReview && !reviewSubmitted && (
+                                    <div className="review-section-inline">
+                                        {activeReviewBookingId === b._id ? (
+                                            <div className="review-inline-form">
+                                                <div className="review-star-row">
+                                                    {[1, 2, 3, 4, 5].map((star) => (
+                                                        <button
+                                                            key={star}
+                                                            type="button"
+                                                            className={`review-star-btn ${star <= reviewRating ? "active" : ""}`}
+                                                            onClick={() => setReviewRating(star)}
+                                                        >
+                                                            ★
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                                <textarea
+                                                    className="review-comment-input"
+                                                    placeholder="Write your review..."
+                                                    value={reviewComment}
+                                                    onChange={(e) => setReviewComment(e.target.value)}
+                                                    rows={3}
+                                                    maxLength={1000}
+                                                />
+                                                {reviewError && <p className="review-error-text">{reviewError}</p>}
+                                                <div className="review-inline-actions">
+                                                    <button
+                                                        className="submit-review-btn"
+                                                        onClick={() => handleSubmitReview(b)}
+                                                        disabled={reviewSubmittingBookingId === b._id}
+                                                    >
+                                                        {reviewSubmittingBookingId === b._id ? "Submitting..." : "Submit Review"}
+                                                    </button>
+                                                    <button
+                                                        className="cancel-review-btn"
+                                                        onClick={closeReviewForm}
+                                                        disabled={reviewSubmittingBookingId === b._id}
+                                                    >
+                                                        Cancel
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <button
+                                                className="write-review-btn"
+                                                onClick={() => openReviewForm(b._id)}
+                                            >
+                                                Write Review
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {canReview && reviewSubmitted && (
+                                    <p className="review-submitted-label">Review Submitted</p>
+                                )}
                             </div>
 
                             {/* Right: Status + Actions */}
@@ -241,7 +426,8 @@ function MyBookings() {
                                 )}
                             </div>
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>

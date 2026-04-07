@@ -34,4 +34,7 @@ const BookingSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+BookingSchema.index({ user: 1, status: 1, createdAt: -1 });
+BookingSchema.index({ showtime: 1, status: 1 });
+
 module.exports = mongoose.model("Booking", BookingSchema);

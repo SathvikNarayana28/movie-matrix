@@ -3,6 +3,13 @@ const User = require("../models/User");
 const Review = require("../models/Review");
 const Showtime = require("../models/Showtime");
 
+const PROFILE_CACHE_TTL_MS = 2 * 60 * 1000;
+const profileCache = new Map();
+
+function cloneProfile(profile) {
+    return JSON.parse(JSON.stringify(profile));
+}
+
 /**
  * Build a weighted user preference profile from their booking history and favorites.
  * 
@@ -20,22 +27,31 @@ const Showtime = require("../models/Showtime");
  * }
  */
 async function buildUserProfile(userId) {
-    // 1. Get all confirmed bookings with populated movie & theater data
-    const bookings = await Booking.find({ user: userId, status: "confirmed" })
-        .populate({
-            path: "showtime",
-            populate: [
-                { path: "movie", select: "title genre cast director language rating _id" },
-                { path: "theater", select: "name area city _id" }
-            ]
-        })
-        .sort({ createdAt: -1 })
-        .lean();
+    const cacheKey = String(userId);
+    const cached = profileCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cloneProfile(cached.data);
+    }
 
-    // 2. Get user favorites
-    const user = await User.findById(userId)
-        .populate("favorites", "title genre cast director language rating _id")
-        .lean();
+    // 1. Get all confirmed bookings with populated movie & theater data
+    const [bookings, user, reviews] = await Promise.all([
+        Booking.find({ user: userId, status: "confirmed" })
+            .populate({
+                path: "showtime",
+                populate: [
+                    { path: "movie", select: "title genre cast director language rating _id" },
+                    { path: "theater", select: "name area city _id" }
+                ]
+            })
+            .sort({ createdAt: -1 })
+            .lean(),
+        User.findById(userId)
+            .populate("favorites", "title genre cast director language rating _id")
+            .lean(),
+        Review.find({ user: userId })
+            .populate("movie", "title genre cast director language rating _id")
+            .lean()
+    ]);
 
     const HALF_LIFE_DAYS = 90;
     const now = Date.now();
@@ -132,9 +148,6 @@ async function buildUserProfile(userId) {
     }
 
     // 5. Boost weights from user's reviews (strong engagement signal, weight scales with rating)
-    const reviews = await Review.find({ user: userId })
-        .populate("movie", "title genre cast director language rating _id")
-        .lean();
 
     for (const rev of reviews) {
         if (!rev.movie) continue;
@@ -185,7 +198,7 @@ async function buildUserProfile(userId) {
         .slice(0, 3)
         .reduce((acc, [k, v]) => { acc[k] = v; return acc; }, {});
 
-    return {
+    const result = {
         genreWeights,
         actorAffinities: topActors,
         directorAffinities: topDirectors,
@@ -196,6 +209,13 @@ async function buildUserProfile(userId) {
         totalBookings: bookings.length,
         favoriteGenres: [...favoriteGenres]
     };
+
+    profileCache.set(cacheKey, {
+        expiresAt: Date.now() + PROFILE_CACHE_TTL_MS,
+        data: result
+    });
+
+    return cloneProfile(result);
 }
 
 /**
@@ -237,4 +257,12 @@ function normalize(obj) {
     return result;
 }
 
-module.exports = { buildUserProfile, getTimeSlot };
+function invalidateUserProfileCache(userId) {
+    profileCache.delete(String(userId));
+}
+
+module.exports = {
+    buildUserProfile,
+    getTimeSlot,
+    invalidateUserProfileCache
+};

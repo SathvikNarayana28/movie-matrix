@@ -1,6 +1,7 @@
 const Showtime = require("../models/Showtime");
 const Theater = require("../models/Theater");
 const { generateSeats } = require("../models/Showtime");
+const { buildShowDateTime } = require("../utils/dateTime");
 
 // ADD A NEW SHOWTIME (with auto-generated seats)
 exports.addShowtime = async (req, res) => {
@@ -49,9 +50,22 @@ exports.addShowtime = async (req, res) => {
 // GET ALL SHOWTIMES (with movie and theater names filled in)
 exports.getAllShowtimes = async (req, res) => {
     try {
-        const showtimes = await Showtime.find()
+        const allShowtimes = await Showtime.find()
             .populate("movie", "title posterUrl language")     // fill in movie details
             .populate("theater", "name city area location");   // fill in theater details
+
+        const now = new Date();
+        const showtimes = allShowtimes
+            .filter((show) => {
+                const showDateTime = buildShowDateTime(show.date, show.time);
+                return showDateTime && showDateTime > now;
+            })
+            .sort((a, b) => {
+                const dateA = buildShowDateTime(a.date, a.time);
+                const dateB = buildShowDateTime(b.date, b.time);
+                if (!dateA || !dateB) return 0;
+                return dateA - dateB;
+            });
 
         res.json(showtimes);
 
@@ -64,9 +78,22 @@ exports.getAllShowtimes = async (req, res) => {
 // GET SHOWTIMES FOR A SPECIFIC MOVIE
 exports.getShowtimesByMovie = async (req, res) => {
     try {
-        const showtimes = await Showtime.find({ movie: req.params.movieId })
+        const allShowtimes = await Showtime.find({ movie: req.params.movieId })
             .populate("movie", "title posterUrl language")
             .populate("theater", "name city area location");
+
+        const now = new Date();
+        const showtimes = allShowtimes
+            .filter((show) => {
+                const showDateTime = buildShowDateTime(show.date, show.time);
+                return showDateTime && showDateTime > now;
+            })
+            .sort((a, b) => {
+                const dateA = buildShowDateTime(a.date, a.time);
+                const dateB = buildShowDateTime(b.date, b.time);
+                if (!dateA || !dateB) return 0;
+                return dateA - dateB;
+            });
 
         res.json(showtimes);
 

@@ -53,5 +53,8 @@ const ShowtimeSchema = new mongoose.Schema({
     ]
 }, { timestamps: true });
 
+ShowtimeSchema.index({ movie: 1, date: 1, time: 1 });
+ShowtimeSchema.index({ theater: 1, date: 1, time: 1 });
+
 module.exports = mongoose.model("Showtime", ShowtimeSchema);
 module.exports.generateSeats = generateSeats;

@@ -376,8 +376,8 @@ function AdminDashboard() {
                                     <div className="stat-label">Theatres</div>
                                 </div>
                                 <div className="stat-card">
-                                    <div className="stat-number">{overview.totalShows.toLocaleString()}</div>
-                                    <div className="stat-label">Total Shows</div>
+                                    <div className="stat-number">{(overview.upcomingShows ?? overview.totalShows).toLocaleString()}</div>
+                                    <div className="stat-label">Upcoming Shows</div>
                                 </div>
                                 <div className="stat-card">
                                     <div className="stat-number">{overview.totalUsers}</div>

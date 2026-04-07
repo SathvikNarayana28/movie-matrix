@@ -2,6 +2,10 @@ const Booking = require("../models/Booking");
 const Showtime = require("../models/Showtime");
 const User = require("../models/User");
 const sendBookingEmail = require("../utils/sendEmail");
+const { buildShowDateTime } = require("../utils/dateTime");
+const { invalidateUserProfileCache } = require("../services/profileBuilder");
+const { invalidateRecommendationCache } = require("../services/recommendationEngine");
+const { invalidateAiContextCache } = require("./aiController");
 
 // LOCK SEATS — temporary 2-minute lock
 exports.lockSeats = async (req, res) => {
@@ -207,6 +211,10 @@ exports.bookTickets = async (req, res) => {
             console.error("❌ Email lookup failed (booking is still confirmed):", emailLookupErr.message);
         }
 
+        invalidateUserProfileCache(req.user.id);
+        invalidateRecommendationCache(req.user.id);
+        invalidateAiContextCache();
+
         res.status(201).json({ msg: "Booking confirmed!", booking });
 
     } catch (err) {
@@ -257,11 +265,10 @@ exports.cancelBooking = async (req, res) => {
         // Check if show has already started
         const showtime = await Showtime.findById(booking.showtime);
         if (showtime) {
-            const showDateStr = showtime.date
-                ? new Date(showtime.date).toISOString().split("T")[0]
-                : "";
-            const showTimeStr = showtime.time || "00:00";
-            const showStart = new Date(`${showDateStr}T${showTimeStr}`);
+            const showStart = buildShowDateTime(showtime.date, showtime.time);
+            if (!showStart) {
+                return res.status(400).json({ msg: "Cannot cancel — invalid showtime date/time" });
+            }
             if (new Date() >= showStart) {
                 return res.status(400).json({ msg: "Cannot cancel — the show has already started" });
             }
@@ -280,6 +287,10 @@ exports.cancelBooking = async (req, res) => {
             showtime.markModified("seats");
             await showtime.save();
         }
+
+        invalidateUserProfileCache(req.user.id);
+        invalidateRecommendationCache(req.user.id);
+        invalidateAiContextCache();
 
         res.json({ msg: "Booking cancelled successfully", booking });
 

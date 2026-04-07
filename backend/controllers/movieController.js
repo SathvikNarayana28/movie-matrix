@@ -1,4 +1,5 @@
 const Movie = require("../models/Movie");
+const { escapeRegex } = require("../utils/escapeRegex");
 const { fetchNowPlaying, fetchMovieDetails, searchMovies } = require("../services/tmdbService");
 
 // ADD A NEW MOVIE (Admin use)
@@ -50,20 +51,20 @@ exports.getAllMovies = async (req, res) => {
         // Build language filter (if provided, case-insensitive)
         let languageFilter = {};
         if (language && language.trim() !== "") {
-            languageFilter = { language: new RegExp(`^${language.trim()}$`, "i") };
+            languageFilter = { language: new RegExp(`^${escapeRegex(language.trim())}$`, "i") };
         }
 
         // Combine all filters
         const baseFilter = { ...genreFilter, ...languageFilter };
 
-        // --- Step 1: If no search query, return all "now showing" movies (with optional filters) ---
+        // --- Step 1: If no search query, return only movies currently in theatres (with optional filters) ---
         if (!search || search.trim() === "") {
-            const movies = await Movie.find({ ...baseFilter, nowShowing: true }).sort(sortOption);
+            const movies = await Movie.find({ ...baseFilter, status: "In Theatres" }).sort(sortOption);
             return res.json(movies);
         }
 
         // --- Step 2: Search MongoDB first (case-insensitive regex) ---
-        const regex = new RegExp(search.trim(), "i");
+        const regex = new RegExp(escapeRegex(search.trim()), "i");
         const filter = {
             $or: [
                 { title: regex },
@@ -230,7 +231,7 @@ exports.getSuggestions = async (req, res) => {
             return res.json({ local: [], external: [] });
         }
 
-        const regex = new RegExp(query.trim(), "i");
+        const regex = new RegExp(escapeRegex(query.trim()), "i");
 
         // 1. Search MongoDB (limit 5)
         const localMovies = await Movie.find({ title: regex })

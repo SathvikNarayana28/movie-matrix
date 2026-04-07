@@ -10,6 +10,7 @@ const Showtime = require("../models/Showtime");
 const Booking = require("../models/Booking");
 const User = require("../models/User");
 const { generateSeats } = require("../models/Showtime");
+const { buildShowDateTime } = require("../utils/dateTime");
 
 // All admin routes require: 1) valid JWT  2) role === "admin"
 router.use(authMiddleware);
@@ -20,11 +21,18 @@ router.use(adminMiddleware);
 // =============================================
 router.get("/overview", async (req, res) => {
     try {
+        const now = new Date();
+        const allShows = await Showtime.find().select("date time").lean();
+        const totalUpcomingShows = allShows.filter((show) => {
+            const showDateTime = buildShowDateTime(show.date, show.time);
+            return showDateTime && showDateTime > now;
+        }).length;
+
         const [totalMovies, nowShowingMovies, totalTheatres, totalShows, totalUsers, totalBookings, revenueResult, recentBookings] = await Promise.all([
             Movie.countDocuments(),
             Movie.countDocuments({ nowShowing: true }),
             Theater.countDocuments(),
-            Showtime.countDocuments(),
+            Promise.resolve(totalUpcomingShows),
             User.countDocuments(),
             Booking.countDocuments({ status: "confirmed" }),
             Booking.aggregate([
@@ -62,6 +70,7 @@ router.get("/overview", async (req, res) => {
             totalMovies,
             nowShowingMovies,
             totalTheatres,
+            upcomingShows: totalShows,
             totalShows,
             totalUsers,
             totalBookings,
@@ -494,10 +503,23 @@ router.post("/shows", async (req, res) => {
 // GET ALL SHOWS (for admin dashboard listing)
 router.get("/shows", async (req, res) => {
     try {
-        const shows = await Showtime.find()
+        const allShows = await Showtime.find()
             .populate("movie", "title")
-            .populate("theater", "name city area")
-            .sort({ date: -1 });
+            .populate("theater", "name city area");
+
+        const now = new Date();
+        const shows = allShows
+            .filter((show) => {
+                const showDateTime = buildShowDateTime(show.date, show.time);
+                return showDateTime && showDateTime > now;
+            })
+            .sort((a, b) => {
+                const dateA = buildShowDateTime(a.date, a.time);
+                const dateB = buildShowDateTime(b.date, b.time);
+                if (!dateA || !dateB) return 0;
+                return dateA - dateB;
+            });
+
         res.json(shows);
     } catch (err) {
         res.status(500).json({ msg: "Server Error" });

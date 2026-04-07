@@ -3,6 +3,134 @@ const Booking = require("../models/Booking");
 const Showtime = require("../models/Showtime");
 const User = require("../models/User");
 const mongoose = require("mongoose");
+const { buildShowDateTime } = require("../utils/dateTime");
+const { invalidateUserProfileCache } = require("../services/profileBuilder");
+const { invalidateRecommendationCache } = require("../services/recommendationEngine");
+
+async function buildVerifiedViewerLookup(movieIds) {
+    const normalizedMovieIds = [...new Set(
+        (movieIds || []).filter(Boolean).map((movieId) => movieId.toString())
+    )];
+
+    if (normalizedMovieIds.length === 0) {
+        return new Set();
+    }
+
+    const showtimes = await Showtime.find({ movie: { $in: normalizedMovieIds } })
+        .select("_id movie")
+        .lean();
+
+    if (showtimes.length === 0) {
+        return new Set();
+    }
+
+    const showtimeToMovieId = new Map(
+        showtimes.map((showtime) => [showtime._id.toString(), showtime.movie.toString()])
+    );
+
+    const bookings = await Booking.find({
+        showtime: { $in: showtimes.map((showtime) => showtime._id) },
+        status: "confirmed"
+    })
+        .select("user showtime")
+        .lean();
+
+    const verifiedLookup = new Set();
+    bookings.forEach((booking) => {
+        const movieId = showtimeToMovieId.get(booking.showtime.toString());
+        if (movieId && booking.user) {
+            verifiedLookup.add(`${movieId}:${booking.user.toString()}`);
+        }
+    });
+
+    return verifiedLookup;
+}
+
+function attachVerifiedViewer(reviews, verifiedLookup) {
+    return reviews.map((review) => {
+        const reviewObject = review.toObject();
+        const movieId = review.movie ? (review.movie._id || review.movie).toString() : null;
+        const userId = review.user ? (review.user._id || review.user).toString() : null;
+
+        reviewObject.verifiedViewer = Boolean(
+            movieId && userId && verifiedLookup.has(`${movieId}:${userId}`)
+        );
+
+        return reviewObject;
+    });
+}
+
+// POST /api/reviews — Create a review from My Bookings page
+// Body: { movieId, rating, comment }
+exports.createReviewFromBookings = async (req, res) => {
+    try {
+        const { movieId, rating, comment } = req.body;
+        const userId = req.user.id;
+        const numericRating = Number(rating);
+        const commentText = typeof comment === "string" ? comment.trim() : "";
+
+        if (!movieId || !mongoose.Types.ObjectId.isValid(movieId)) {
+            return res.status(400).json({ error: "Valid movieId is required." });
+        }
+        if (!numericRating || !commentText) {
+            return res.status(400).json({ error: "Rating and comment are required." });
+        }
+        if (numericRating < 1 || numericRating > 5) {
+            return res.status(400).json({ error: "Rating must be between 1 and 5." });
+        }
+        if (commentText.length > 1000) {
+            return res.status(400).json({ error: "Comment must be 1000 characters or less." });
+        }
+
+        const existing = await Review.findOne({ user: userId, movie: movieId });
+        if (existing) {
+            return res.status(400).json({ error: "You have already reviewed this movie." });
+        }
+
+        const bookings = await Booking.find({ user: userId, status: "confirmed" })
+            .populate({
+                path: "showtime",
+                select: "movie date time"
+            });
+
+        const now = new Date();
+        const eligibleBooking = bookings.find((booking) => {
+            const showtime = booking.showtime;
+            if (!showtime || !showtime.movie) return false;
+
+            const bookedMovieId = showtime.movie.toString();
+            if (bookedMovieId !== movieId) return false;
+
+            const showDateTime = buildShowDateTime(showtime.date, showtime.time);
+            return showDateTime && showDateTime < now;
+        });
+
+        if (!eligibleBooking) {
+            return res.status(403).json({ error: "You can review only after a booked showtime has finished." });
+        }
+
+        const review = await Review.create({
+            user: userId,
+            movie: movieId,
+            rating: numericRating,
+            comment: commentText
+        });
+
+        await review.populate("user", "name profilePic");
+        await review.populate("movie", "title posterUrl");
+
+        invalidateUserProfileCache(userId);
+        invalidateRecommendationCache(userId);
+
+        res.status(201).json(review);
+    } catch (err) {
+        console.error("Create review from bookings error:", err);
+        if (err.code === 11000) {
+            return res.status(400).json({ error: "You have already reviewed this movie." });
+        }
+        res.status(500).json({ error: "Failed to submit review." });
+    }
+};
 
 // POST /api/reviews/:movieId — Create a review (with booking + showtime verification)
 exports.createReview = async (req, res) => {
@@ -37,10 +165,13 @@ exports.createReview = async (req, res) => {
         }
 
         // STEP 2: Check if movie currently has active showtimes (running in theatres)
-        const today = new Date().toISOString().split("T")[0]; // "YYYY-MM-DD"
-        const activeShowtime = await Showtime.findOne({
-            movie: movieId,
-            date: { $gte: today }
+        const movieShowtimes = await Showtime.find({ movie: movieId })
+            .select("date time")
+            .lean();
+        const now = new Date();
+        const activeShowtime = movieShowtimes.some((showtime) => {
+            const showDateTime = buildShowDateTime(showtime.date, showtime.time);
+            return showDateTime && showDateTime > now;
         });
 
         if (!activeShowtime) {
@@ -63,6 +194,9 @@ exports.createReview = async (req, res) => {
 
         // Populate user name before returning
         await review.populate("user", "name profilePic");
+
+        invalidateUserProfileCache(userId);
+        invalidateRecommendationCache(userId);
 
         res.status(201).json(review);
     } catch (err) {
@@ -111,23 +245,8 @@ exports.getMovieReviews = async (req, res) => {
             .populate("user", "name profilePic")
             .sort({ createdAt: -1 });
 
-        // Find all showtimes for this movie to check bookings
-        const movieShowtimeIds = await Showtime.find({ movie: movieId }).select("_id");
-        const showtimeIds = movieShowtimeIds.map(st => st._id);
-
-        // Check which reviewers have confirmed bookings
-        const bookings = await Booking.find({
-            showtime: { $in: showtimeIds },
-            status: "confirmed"
-        }).select("user");
-        const bookedUserIds = bookings.map(b => b.user.toString());
-
-        // Add verifiedViewer flag to each review
-        const reviewsWithBadge = reviews.map(rev => {
-            const revObj = rev.toObject();
-            revObj.verifiedViewer = bookedUserIds.includes(rev.user._id.toString());
-            return revObj;
-        });
+        const verifiedLookup = await buildVerifiedViewerLookup([movieId]);
+        const reviewsWithBadge = attachVerifiedViewer(reviews, verifiedLookup);
 
         res.json(reviewsWithBadge);
     } catch (err) {
@@ -193,6 +312,8 @@ exports.updateReview = async (req, res) => {
         await review.save();
 
         await review.populate("user", "name profilePic");
+        invalidateUserProfileCache(req.user.id);
+        invalidateRecommendationCache(req.user.id);
         res.json(review);
     } catch (err) {
         console.error("Update review error:", err);
@@ -214,6 +335,8 @@ exports.deleteReview = async (req, res) => {
         }
 
         await review.deleteOne();
+        invalidateUserProfileCache(req.user.id);
+        invalidateRecommendationCache(req.user.id);
         res.json({ message: "Review deleted successfully." });
     } catch (err) {
         console.error("Delete review error:", err);
@@ -231,23 +354,10 @@ exports.getAllReviews = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(50);
 
-        // Compute verifiedViewer badge for each review
-        const reviewsWithBadge = await Promise.all(reviews.map(async (rev) => {
-            const revObj = rev.toObject();
-            if (rev.movie) {
-                const showtimeIds = await Showtime.find({ movie: rev.movie._id }).select("_id");
-                const sIds = showtimeIds.map(s => s._id);
-                const booking = await Booking.findOne({
-                    user: rev.user._id,
-                    showtime: { $in: sIds },
-                    status: "confirmed"
-                });
-                revObj.verifiedViewer = !!booking;
-            } else {
-                revObj.verifiedViewer = false;
-            }
-            return revObj;
-        }));
+        const verifiedLookup = await buildVerifiedViewerLookup(
+            reviews.map((review) => review.movie?._id || review.movie)
+        );
+        const reviewsWithBadge = attachVerifiedViewer(reviews, verifiedLookup);
 
         res.json(reviewsWithBadge);
     } catch (err) {
@@ -274,23 +384,10 @@ exports.getReviewsFeed = async (req, res) => {
             .sort({ createdAt: -1 })
             .limit(50);
 
-        // Dynamically compute verifiedViewer for each review by checking bookings
-        const reviewsWithBadge = await Promise.all(reviews.map(async (rev) => {
-            const revObj = rev.toObject();
-            if (rev.movie) {
-                const showtimeIds = await Showtime.find({ movie: rev.movie._id }).select("_id");
-                const sIds = showtimeIds.map(s => s._id);
-                const booking = await Booking.findOne({
-                    user: rev.user._id,
-                    showtime: { $in: sIds },
-                    status: "confirmed"
-                });
-                revObj.verifiedViewer = !!booking;
-            } else {
-                revObj.verifiedViewer = false;
-            }
-            return revObj;
-        }));
+        const verifiedLookup = await buildVerifiedViewerLookup(
+            reviews.map((review) => review.movie?._id || review.movie)
+        );
+        const reviewsWithBadge = attachVerifiedViewer(reviews, verifiedLookup);
 
         res.json(reviewsWithBadge);
     } catch (err) {
@@ -460,6 +557,10 @@ exports.addCommentToReview = async (req, res) => {
 // GET /api/reviews/user/:userId — All reviews by a specific user
 exports.getUserReviews = async (req, res) => {
     try {
+        if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+            return res.status(400).json({ error: "Invalid userId." });
+        }
+
         const reviews = await Review.find({ user: req.params.userId })
             .populate("movie", "title posterUrl")
             .sort({ createdAt: -1 });

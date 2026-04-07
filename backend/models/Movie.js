@@ -21,4 +21,6 @@ const MovieSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+MovieSchema.index({ status: 1, rating: -1 });
+
 module.exports = mongoose.model("Movie", MovieSchema);

@@ -1,4 +1,5 @@
 const Theater = require("../models/Theater");
+const { escapeRegex } = require("../utils/escapeRegex");
 
 // ADD A NEW THEATER
 exports.addTheater = async (req, res) => {
@@ -23,7 +24,7 @@ exports.getAllTheaters = async (req, res) => {
         const filter = {};
         if (req.query.city) {
             // Case-insensitive match
-            filter.city = { $regex: new RegExp(`^${req.query.city}$`, "i") };
+            filter.city = { $regex: new RegExp(`^${escapeRegex(req.query.city)}$`, "i") };
         }
 
         const theaters = await Theater.find(filter);
@@ -99,7 +100,7 @@ exports.getNearbyTheaters = async (req, res) => {
         const userLng = parseFloat(req.query.lng);
 
         const theaters = await Theater.find({
-            city: { $regex: new RegExp(`^${city}$`, "i") }
+            city: { $regex: new RegExp(`^${escapeRegex(city)}$`, "i") }
         }).lean();
 
         if (!isNaN(userLat) && !isNaN(userLng)) {

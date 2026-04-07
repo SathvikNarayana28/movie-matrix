@@ -1,4 +1,6 @@
 const User = require("../models/User");
+const { invalidateUserProfileCache } = require("../services/profileBuilder");
+const { invalidateRecommendationCache } = require("../services/recommendationEngine");
 
 // TOGGLE FAVORITE (add if not saved, remove if already saved)
 exports.toggleFavorite = async (req, res) => {
@@ -19,11 +21,15 @@ exports.toggleFavorite = async (req, res) => {
             // Not in favorites — add it
             user.favorites.push(movieId);
             await user.save();
+            invalidateUserProfileCache(req.user.id);
+            invalidateRecommendationCache(req.user.id);
             res.json({ msg: "Movie added to favorites", favorites: user.favorites });
         } else {
             // Already in favorites — remove it
             user.favorites.splice(index, 1);
             await user.save();
+            invalidateUserProfileCache(req.user.id);
+            invalidateRecommendationCache(req.user.id);
             res.json({ msg: "Movie removed from favorites", favorites: user.favorites });
         }
 
